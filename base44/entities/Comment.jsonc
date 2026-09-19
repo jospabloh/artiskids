@@ -1,0 +1,20 @@
+{
+  "name": "Comment",
+  "type": "object",
+  "properties": {
+    "drawing_id": {
+      "type": "string"
+    },
+    "author_name": {
+      "type": "string"
+    },
+    "text": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "drawing_id",
+    "author_name",
+    "text"
+  ]
+}

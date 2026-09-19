@@ -1,0 +1,30 @@
+{
+  "name": "Drawing",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "image_url": {
+      "type": "string"
+    },
+    "drawn_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "creator_name": {
+      "type": "string"
+    },
+    "album": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "title",
+    "image_url",
+    "creator_name"
+  ]
+}
