@@ -10,6 +10,7 @@ import Layout from "@/components/Layout";
 import Home from "@/pages/Home";
 import Upload from "@/pages/Upload";
 import DrawingDetail from "@/pages/DrawingDetail";
+import Family from "@/pages/Family";
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -41,6 +42,7 @@ const AuthenticatedApp = () => {
         <Route path="/" element={<Home />} />
         <Route path="/subir" element={<Upload />} />
         <Route path="/dibujo/:id" element={<DrawingDetail />} />
+        <Route path="/familia" element={<Family />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>

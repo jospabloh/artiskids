@@ -1,9 +1,10 @@
 import { Outlet, Link, useLocation } from "react-router-dom";
-import { Palette, Upload, Home as HomeIcon } from "lucide-react";
+import { Palette, Upload, Home as HomeIcon, Users } from "lucide-react";
 
 const navItems = [
   { to: "/", label: "Inicio", icon: HomeIcon },
   { to: "/subir", label: "Subir dibujo", icon: Upload },
+  { to: "/familia", label: "Familia", icon: Users },
 ];
 
 export default function Layout() {
@@ -48,6 +49,7 @@ export default function Layout() {
       </main>
       <footer className="text-center text-xs text-stone-400 py-6">
         Hecho con cariño para las familias · Cápsula de Arte
+        <div className="mt-1 text-stone-400">Hecho por <span className="font-semibold text-stone-500">Acacia Consultoría</span></div>
       </footer>
     </div>
   );

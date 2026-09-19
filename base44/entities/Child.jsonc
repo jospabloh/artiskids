@@ -1,0 +1,16 @@
+{
+  "name": "Child",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string"
+    },
+    "birth_date": {
+      "type": "string",
+      "format": "date"
+    }
+  },
+  "required": [
+    "name"
+  ]
+}

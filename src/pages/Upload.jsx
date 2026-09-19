@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, Link } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { Image as ImageIcon, Loader2, Save } from "lucide-react";
 
@@ -12,6 +12,11 @@ export default function Upload() {
   const [form, setForm] = useState({ title: "", description: "", drawn_date: "", creator_name: "", album: "Otros" });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
+  const [children, setChildren] = useState([]);
+
+  useEffect(() => {
+    base44.entities.Child.list("name", 100).then(setChildren).catch(() => {});
+  }, []);
 
   const handleFile = (e) => {
     const f = e.target.files?.[0];
@@ -80,12 +85,28 @@ export default function Upload() {
             />
           </Field>
           <Field label="Creador *">
-            <input
-              value={form.creator_name}
-              onChange={(e) => setForm({ ...form, creator_name: e.target.value })}
-              placeholder="Sofía (4 años)"
-              className="input"
-            />
+            {children.length > 0 ? (
+              <select
+                value={form.creator_name}
+                onChange={(e) => setForm({ ...form, creator_name: e.target.value })}
+                className="input"
+              >
+                <option value="">Selecciona un hijo...</option>
+                {children.map((c) => (
+                  <option key={c.id} value={c.name}>{c.name}</option>
+                ))}
+              </select>
+            ) : (
+              <div className="space-y-1.5">
+                <input
+                  value={form.creator_name}
+                  onChange={(e) => setForm({ ...form, creator_name: e.target.value })}
+                  placeholder="Sofía (4 años)"
+                  className="input"
+                />
+                <Link to="/familia" className="text-xs text-amber-600 font-medium">+ Registrar hijo en el catálogo</Link>
+              </div>
+            )}
           </Field>
           <Field label="Fecha del dibujo">
             <input

@@ -18,6 +18,14 @@ export default function DrawingDetail() {
   const [commentText, setCommentText] = useState("");
   const [author, setAuthor] = useState("");
   const [posting, setPosting] = useState(false);
+  const [people, setPeople] = useState([]);
+
+  useEffect(() => {
+    Promise.all([
+      base44.entities.Parent.list("name", 100).catch(() => []),
+      base44.entities.Relative.list("name", 100).catch(() => []),
+    ]).then(([p, r]) => setPeople([...p, ...r]));
+  }, []);
 
   const loadAll = async () => {
     try {
@@ -162,12 +170,25 @@ export default function DrawingDetail() {
         </div>
 
         <form onSubmit={submitComment} className="space-y-3">
-          <input
-            value={author}
-            onChange={(e) => setAuthor(e.target.value)}
-            placeholder="Tu nombre"
-            className="w-full border border-stone-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-amber-400"
-          />
+          {people.length > 0 ? (
+            <select
+              value={author}
+              onChange={(e) => setAuthor(e.target.value)}
+              className="w-full border border-stone-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-amber-400"
+            >
+              <option value="">¿Quién comenta?</option>
+              {people.map((p) => (
+                <option key={p.id} value={p.name}>{p.name}</option>
+              ))}
+            </select>
+          ) : (
+            <input
+              value={author}
+              onChange={(e) => setAuthor(e.target.value)}
+              placeholder="Tu nombre"
+              className="w-full border border-stone-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-amber-400"
+            />
+          )}
           <div className="flex gap-2">
             <input
               value={commentText}
