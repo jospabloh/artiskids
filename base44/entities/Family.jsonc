@@ -1,0 +1,110 @@
+{
+  "name": "Family",
+  "properties": {
+    "billing_status": {
+      "description": "Governs what the family can do (Module 1). Write-locked: only Mission Control's unified license cron or this app's own service-role functions may set it \u2014 never a family member, regardless of role.",
+      "enum": [
+        "trial",
+        "active",
+        "view_only",
+        "suspended"
+      ],
+      "rls": {
+        "write": {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      },
+      "type": "string"
+    },
+    "created_by_email": {
+      "description": "Email of the user who created the family (its first family_admin).",
+      "type": "string"
+    },
+    "join_code": {
+      "description": "Shareable code a new member redeems to join this family. Unique, generated server-side by the createFamily function (Phase 3).",
+      "type": "string"
+    },
+    "license_expires_at": {
+      "description": "Current paid-period end. Write-locked, same reasoning as trial_end_at.",
+      "format": "date-time",
+      "rls": {
+        "write": {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      },
+      "type": "string"
+    },
+    "license_plan": {
+      "description": "Mercado Pago plan id once billing_status leaves trial. Null during trial. Same write lock as billing_status \u2014 set only by the billing function.",
+      "rls": {
+        "write": {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      },
+      "type": "string"
+    },
+    "name": {
+      "description": "Display name for the family, e.g. \"Familia Herrera\".",
+      "type": "string"
+    },
+    "trial_end_at": {
+      "description": "Set once at family creation (created_at + 30 days, server time). Write-locked so a member can't extend their own trial.",
+      "format": "date-time",
+      "rls": {
+        "write": {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      },
+      "type": "string"
+    }
+  },
+  "required": [
+    "name",
+    "billing_status"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {
+      "$or": [
+        {
+          "id": "{{user.data.family_id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "id": "{{user.data.family_id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    }
+  },
+  "type": "object"
+}
