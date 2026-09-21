@@ -1,16 +1,70 @@
 {
   "name": "Child",
-  "type": "object",
   "properties": {
-    "name": {
+    "birth_date": {
+      "format": "date",
       "type": "string"
     },
-    "birth_date": {
-      "type": "string",
-      "format": "date"
+    "family_id": {
+      "description": "Tenant boundary \u2014 the family this child profile belongs to.",
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
     }
   },
   "required": [
     "name"
-  ]
+  ],
+  "rls": {
+    "create": {
+      "$or": [
+        {
+          "data.family_id": "{{user.data.family_id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "data.family_id": "{{user.data.family_id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "read": {
+      "$or": [
+        {
+          "data.family_id": "{{user.data.family_id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "data.family_id": "{{user.data.family_id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    }
+  },
+  "type": "object"
 }
