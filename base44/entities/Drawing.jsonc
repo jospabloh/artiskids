@@ -1,24 +1,27 @@
 {
   "name": "Drawing",
-  "type": "object",
   "properties": {
-    "title": {
+    "album": {
+      "type": "string"
+    },
+    "creator_name": {
       "type": "string"
     },
     "description": {
       "type": "string"
     },
+    "drawn_date": {
+      "format": "date",
+      "type": "string"
+    },
+    "family_id": {
+      "description": "Tenant boundary \u2014 the family this drawing belongs to.",
+      "type": "string"
+    },
     "image_url": {
       "type": "string"
     },
-    "drawn_date": {
-      "type": "string",
-      "format": "date"
-    },
-    "creator_name": {
-      "type": "string"
-    },
-    "album": {
+    "title": {
       "type": "string"
     }
   },
@@ -26,5 +29,56 @@
     "title",
     "image_url",
     "creator_name"
-  ]
+  ],
+  "rls": {
+    "create": {
+      "$or": [
+        {
+          "data.family_id": "{{user.data.family_id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "data.family_id": "{{user.data.family_id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "read": {
+      "$or": [
+        {
+          "data.family_id": "{{user.data.family_id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "data.family_id": "{{user.data.family_id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    }
+  },
+  "type": "object"
 }
