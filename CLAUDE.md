@@ -58,13 +58,28 @@ why they are frozen here before schema work starts.
   live `User` table: it is the only real account today (`role: admin`).
 - **Support contact:** the same portfolio channels as every other app —
   WhatsApp 449 895 8291, `soporte@acaciaco.com.mx`.
-- **Deploy discipline:** adopt Module 11's CLI path (`npm run deploy`,
-  `deploy:site`, `deploy:entities` with typed confirmation,
-  `validate:functions` capped at 40). The current `README.md`'s "publish via
-  GitHub sync + dashboard" instruction is being replaced in Phase 1 — Base44
-  functions don't auto-deploy from GitHub sync (see
-  `acacia-app-standard/docs/incidents.md`), so that path silently ships a
-  backend that never updates.
+- **Deploy discipline — corrected 2026-09-21, do not re-adopt Module 11's
+  generic CLI path here.** Verified against the live Base44 API
+  (`GET /api/apps/{id}/github/connection`): this app has an **active**
+  GitHub connection to `jospabloh/artiskids` with `webhook_active: true` —
+  every push auto-pulls into the Base44 builder tree. That's exactly what
+  the repo's own generated `README.md` already said ("publish from the
+  dashboard, never `base44 deploy`, since a CLI deploy ships your local tree
+  directly and bypasses the sync"). Module 11's `npm run deploy` CLI pattern
+  is written for portfolio apps that do NOT have GitHub sync and deploy
+  straight from a local checkout — applying it here would cause the exact
+  divergence incident the standard exists to prevent, just from the other
+  direction. So for artiskids: git push is the only way code reaches Base44;
+  publishing (making a synced commit live) still needs an explicit step
+  (Base44 dashboard, or `POST /api/apps/{id}/deploy` against the checkpoint
+  matching that commit) — never a raw CLI `base44 deploy`. Module 11's other
+  intent (an endpoint-count guard, verify-by-content after publishing) still
+  applies, just implemented against this app's actual mechanism: Phase 1
+  adds `validate:functions` as a local dir-count check, not a deploy
+  wrapper. Whether `base44 entities push`/function-specific pushes also
+  bypass the GitHub sync (as `base44 deploy` does) is unverified — check
+  before Phase 2/3 write any entities/functions push tooling; don't assume
+  it behaves like `deploy` just because both are CLI commands.
 - **Domain timing:** the Mission Control registry row (Phase 5) is seeded
   with `url: null` now, same as kitchops/ctrlhq were before their DNS went
   live; a follow-up migration fills it in at Phase 6's cutover.
@@ -111,14 +126,19 @@ content/schema, never by hash or by assuming a merge shipped.
 0. **Frozen decisions + live-state verification** (this section). Done
    2026-09-20.
 1. **Repo hygiene & deploy discipline** — dead Stripe deps out, branding,
-   `base44.app.json` + deploy/validate scripts, `.env.example`, changelog
-   scaffold. Modules 6 (scaffold), 11, 16 (inventory).
+   `validate:functions` (endpoint-count guard, GitHub-sync-safe), a
+   `verify-published` helper that checks the live app against the latest
+   pushed commit, `.env.example`, changelog scaffold. No CLI deploy wrapper
+   scripts — see the corrected Deploy discipline decision above. Modules 6
+   (scaffold), 11 (adapted), 16 (inventory).
 2. **Family/roles/RLS schema** — `Family` entity, `family_id`/`family_role`
    on `User` and all tenant entities, four-op RLS with the explicit
    service-role admin branch on every op, `SupportTicket`/`AppSession`/
    `RolePermission` entities, `validate-rls` script. Modules 1 (field), 2, 4,
-   18-retired, 19. **Pauses before `deploy:entities`** — that push can delete
-   remote entities, so it's human-run only, confirmed by content diff after.
+   18-retired, 19. **Pauses before the entity-schema push goes live** —
+   first confirm whether that path also bypasses GitHub sync the way
+   `base44 deploy` does; either way it can delete remote entities, so it's
+   human-run only, confirmed by content diff after.
 3. **Backend functions, Mission Control bridge, secrets** — the
    `acaciaControl` bridge (`_acaciaSign.ts` copied unchanged from
    `shared/bridge/`, `ACCEPT_LEGACY_MASTER = false`), family/content/session/
@@ -148,8 +168,12 @@ content/schema, never by hash or by assuming a merge shipped.
    Modules 13, 14, 5 (proof), 16 (proof), 17 (proof), 1 (proof). **Pauses at
    domain cutover.**
 
-Rules for whoever executes a later phase: never pass `--app-id`; never run
-`entities push` without the typed confirmation; migrate additively, never
+Rules for whoever executes a later phase: never run `base44 deploy` on this
+repo — it has active GitHub sync, so a raw CLI deploy bypasses it and
+diverges from what's in git; publish only via the dashboard or a deploy
+call against the checkpoint matching the pushed commit; never push an
+entity-schema change without a typed confirmation and a content diff after;
+migrate additively, never
 narrow a live RLS rule even with zero real data — it's the habit that
 matters, not this instance; never put a secret in the repo or under a
 `VITE_` prefix; never edit a copied `ThemeSwitcher.jsx`/`smoke.spec.js`/
