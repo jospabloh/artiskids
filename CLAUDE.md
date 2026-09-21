@@ -114,6 +114,17 @@ why they are frozen here before schema work starts.
   unverified from this session — check the Base44 auth panel before Phase 4
   ships the real login page, so it never shows a button for a provider that
   isn't configured (Module 10).
+- No real brand assets exist yet (logo, favicon, colour direction) — Phase 1
+  removed the default Base44 favicon link rather than point at a placeholder
+  that would need replacing anyway. `index.html` currently ships with no
+  favicon at all; add a real one (and the acaciaco-site page's images) once
+  brand assets exist, before Phase 6's cutover.
+- `npm run typecheck` already had pre-existing errors in `Login.jsx`,
+  `Register.jsx`, `OAuthConsent.jsx`, `ResetPassword.jsx` (unrouted scaffold
+  pages, shadcn prop-typing gaps) and `Upload.jsx` (`UploadPublicFile` not in
+  the SDK's `CoreIntegrations` type) — confirmed present before this
+  session's changes (`git stash` + rerun). Phase 4 reworks all of these
+  pages anyway; fix the typing as part of that, not as a separate pass.
 
 ## Rollout phases
 
