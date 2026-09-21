@@ -143,14 +143,20 @@ content/schema, never by hash or by assuming a merge shipped.
    scripts — see the corrected Deploy discipline decision above. Modules 6
    (scaffold), 11 (adapted), 16 (inventory).
 2. **Family/roles/RLS schema** — `Family` entity, `family_id`/`family_role`
-   on `User` and all tenant entities, four-op RLS with the explicit
-   service-role admin branch on every op, `SupportTicket`/`AppSession`/
-   `RolePermission` entities, `validate-rls` script. Modules 1 (field), 2, 4,
-   18-retired, 19. **Pauses before the entity-schema push goes live** —
-   first confirm whether that path also bypasses GitHub sync the way
-   `base44 deploy` does; either way it can delete remote entities, so it's
-   human-run only, confirmed by content diff after.
-3. **Backend functions, Mission Control bridge, secrets** — the
+   on `User`, `family_id` on the six existing tenant entities
+   (`Child`/`Parent`/`Relative`/`Drawing`/`Comment`/`Reaction`), four-op RLS
+   with the explicit service-role admin branch on every op, `validate-rls`
+   script. **`SupportTicket`/`AppSession`/`RolePermission` moved to Phase 3**
+   (corrected 2026-09-21) — nothing consumes them until Phase 3's functions
+   exist, and bundling them into this push would widen its blast radius past
+   what Phase 2 actually needs; one focused schema push beats a bigger one
+   split across two reasons. Modules 1 (field), 2, 4, 18-retired, 19.
+   **Pauses before the entity-schema push goes live** — first confirm
+   whether that path also bypasses GitHub sync the way `base44 deploy` does;
+   either way it can delete remote entities, so it's human-run only,
+   confirmed by content diff after.
+3. **Backend functions, Mission Control bridge, secrets** — `SupportTicket`/
+   `AppSession`/`RolePermission` entities (moved here from Phase 2), the
    `acaciaControl` bridge (`_acaciaSign.ts` copied unchanged from
    `shared/bridge/`, `ACCEPT_LEGACY_MASTER = false`), family/content/session/
    support function routers, the permission registry + generator. Modules 3
@@ -178,6 +184,39 @@ content/schema, never by hash or by assuming a merge shipped.
    "could not verify" list), then DNS + the Mission Control URL migration.
    Modules 13, 14, 5 (proof), 16 (proof), 17 (proof), 1 (proof). **Pauses at
    domain cutover.**
+
+## RLS design notes (Phase 2, 2026-09-21)
+
+Confirmed the actual schema shape from the Base44 MCP tools themselves
+(`create_entity_schema`/`update_entity_schema`), not just STANDARD.md's
+narrative: entity-level `rls: {create, read, update, delete}`, each a
+Mongo-style condition combinable with `$and`/`$or`; `user_condition` does
+**exact-equality on a built-in user attribute only** (`role`/`id`/`email` —
+its own example never shows a custom field, unlike the entity-field-compare
+rule type, which explicitly documents `data.`-prefixed custom fields). Two
+decisions followed from that:
+
+- **Role gating (family_admin vs member) is NOT done in RLS.** Whether
+  `user_condition` accepts a custom field like `data.family_role` is
+  undocumented, and guessing wrong here is exactly the silent-failure
+  category Module 4 warns about — over- or under-matching with no error.
+  RLS's job stays the tenant boundary only (`data.family_id` ==
+  `{{user.data.family_id}}`, plus the admin branch); which role can do what
+  within a family is a Phase 3 Safe-function check against the permission
+  registry, which is what Module 2/3's split is for anyway.
+- **`family_id` on the six existing tenant entities is NOT field-write-locked
+  yet.** `User.family_id`/`User.family_role` and `Family`'s billing fields
+  ARE locked to `{"rls":{"write":{"user_condition":{"role":"admin"}}}}` now
+  — nothing writes to them today, so locking them is pure gain. But
+  `Drawing`/`Comment`/`Reaction`/`Child`/`Parent`/`Relative` are still
+  written directly from the client (`Upload.jsx`, `DrawingDetail.jsx`,
+  `CatalogList.jsx`) — locking their `family_id` to admin-write now would
+  break every one of those paths until Phase 4 replaces them with Safe
+  function calls. Lock them then, not now — this is the additive-migration
+  rule from Module 4 applied to a field lock, not just a whole rule.
+
+Full schema for both new decisions lives in `base44/entities/*.jsonc` as of
+this phase, deployed to the live app only after explicit sign-off.
 
 Rules for whoever executes a later phase: never run `base44 deploy` on this
 repo — it has active GitHub sync, so a raw CLI deploy bypasses it and

@@ -11,6 +11,7 @@
     "typecheck": "tsc -p ./jsconfig.json",
     "preview": "vite preview",
     "validate:functions": "node scripts/validate-functions.mjs",
+    "validate:rls": "node scripts/validate-rls.mjs",
     "release": "node scripts/release.mjs"
   },
   "dependencies": {
