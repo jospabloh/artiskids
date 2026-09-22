@@ -11,6 +11,10 @@
     "user_email": {
       "type": "string"
     },
+    "device_id": {
+      "description": "Stable per-browser identity (a UUID the client generates once and keeps in localStorage, shared/session/useSessionManager.js's getOrCreateDeviceId()) -- the actual find-or-create key for manageSession. Not user-facing; `device` below is what the device list shows.",
+      "type": "string"
+    },
     "device": {
       "description": "A short human-readable label for the device/browser (from the user agent), shown in the device list -- never the raw user agent string.",
       "type": "string"
@@ -37,7 +41,7 @@
       "type": "string"
     }
   },
-  "required": ["family_id", "user_email", "status", "started_at", "last_active_at"],
+  "required": ["family_id", "user_email", "device_id", "status", "started_at", "last_active_at"],
   "rls": {
     "create": {
       "$or": [
