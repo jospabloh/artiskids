@@ -253,12 +253,41 @@ content/schema, never by hash or by assuming a merge shipped.
    idle warning, an admin's danger-zone actions) -- this environment's proxy
    can't reach a live Base44 preview, so that's Phase 6's `npm run
    test:smoke`-equivalent manual pass, not something claimed done here.
-5. **Mission Control + acaciaco-site** — registry migration (`url: null`),
-   `licenseControl.js`/`ticketControl.js`/`messaging.js` entries +
-   `licenseCatalog.js` mirror, `apps/artiskids.html` +
-   `soporte.html`/`KNOWN_APPS` entry. Module 9, 17. **Pauses before the
-   migration runs against production Supabase** — it's read by every cron
-   from that point on.
+5. **Mission Control + acaciaco-site — code-complete 2026-09-22, two PRs
+   open, not deployed.** `licenseControl.js`/`ticketControl.js`/
+   `messaging.js` entries + `licenseCatalog.js` mirror + the seed migration
+   in `jospabloh/acacia-mission-control`
+   ([PR #107](https://github.com/jospabloh/acacia-mission-control/pull/107));
+   `apps/artiskids.html` + `soporte.html`/`KNOWN_APPS` entry (plus the
+   homepage `#apps` grid/footer and every other page's shared footer app
+   list) in `jospabloh/acaciaco-site`
+   ([PR #245](https://github.com/jospabloh/acaciaco-site/pull/245)). Module
+   9, 17.
+
+   `licenseControl.js`'s `artiskids` entry set `plans: []` — no paid tier
+   names exist yet (the frozen decision above only commits to "30-day trial,
+   then a paid plan via Mercado Pago," no structure), and the marketing
+   page's pricing section says exactly that instead of inventing numbers
+   the way every other app page's three-tier grid does. No brand assets
+   exist for the marketing page either (logo, hero screenshot, OG image) —
+   it uses inline SVG for the mark, same pattern RADAR's homepage card
+   already uses, and falls back to the portfolio-wide `acacia-og.png`
+   rather than a link that would 404.
+
+   `ticketControl.js` needed a real code change, not just a config entry:
+   `SupportTicket` has a single `message` field, no reply-thread entity —
+   the existing two-mode model (`message`/`inline`) never anticipated an
+   app with no thread at all. `thread: null` plus a guard in
+   `buildTicketReply` that errors instead of assuming a shape that doesn't
+   exist covers it; status changes work, replies from the panel don't yet.
+   Two new tests in that repo cover both paths.
+
+   **Pauses before the migration runs against production Supabase** — it's
+   read by every cron from that point on. Both PRs are additionally
+   downstream of Phase 3's own pause: the registry row can exist before
+   artiskids' backend is deployed (the sync cron just gets "not reachable"
+   until then, same as any newly-registered app before its first
+   successful sync), but nothing here makes the bridge itself live.
 6. **Deploy, prove, audit, cut over** — human-run deploys, *Sincronizar
    ahora* → `app_health` + `control:run-sync` proof, smoke suite wired to
    `.github/workflows/smoke.yml`, session-reap gate exercised, the dated
