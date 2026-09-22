@@ -390,3 +390,66 @@ matters, not this instance; never put a secret in the repo or under a
 `_acaciaSign.ts`/`shared/session/` file in place — the portfolio-wide
 mirror check depends on them staying byte-identical; never touch another
 app's repo or Mission Control entry from here.
+
+## Phase 3's real blocker: backend functions were never registered (2026-09-22)
+
+Secrets (`INGEST_HMAC_SECRET`, `ACACIA_APP_SLUG`, `PLATFORM_OWNER_EMAIL`,
+`CRON_SECRET`) confirmed present and matching via `base44 secrets list`
+(exact names checked against every `secrets.get(...)` call in
+`base44/functions/`) — the frozen "no verify-after-the-fact" concern from
+Phase 3's own notes above is resolved. A deploy was then run (via the
+dashboard, git commit `0b2a85f`, matching `main`) and confirmed live —
+`GET /api/apps/{id}` shows `last_deployed_git_commit_hash` equal to that
+commit, `status.state: ready`, GitHub connection `active`.
+
+**None of that was the actual blocker.** The same `GET /api/apps/{id}` call
+shows `has_backend_functions_enabled: false` and `functions: {}` —
+zero backend functions registered on the app, despite all six directories
+(`acaciaControl`, `family`, `content`, `support`, `session`,
+`purgeStaleSessions`) being present and synced in the app's own file tree
+(confirmed via `list_directory` against the live app, not just the repo).
+Deploying the frontend and having the files present is not the same as
+Base44 treating them as live function endpoints — `createFamily` (called
+from `/bienvenida`) 404s, confirmed live in the browser: "Request failed
+with status code 404".
+
+Searched the full platform API catalog (24 areas, 218 operations via
+`list_api_catalog`) for anything that flips `has_backend_functions_enabled`
+or registers functions explicitly — nothing documented does. Rather than
+guess at an undocumented mutation against a production app (exactly the
+"guessing wrong is silent failure" trap Module 14 exists to avoid), this
+needs a human to check the Base44 dashboard directly — likely a
+"Backend"/"Functions" panel or a workspace-plan capability that needs
+enabling before any of the six functions can ever go live, independent of
+git sync or deploy state.
+
+**Until that's resolved, every Phase 3/4 feature that calls a function 404s
+the same way**: creating or joining a family, uploading through the Safe
+path, sessions, support tickets. This is a hard stop on the whole backend,
+not specific to `createFamily`.
+
+### The frontend must not show that 404 as raw text, and mostly didn't get fixed yet
+
+The onboarding screen (`FamilyOnboarding.jsx`) was showing axios's own
+`"Request failed with status code 404"` verbatim via `setError(err.message)`
+— a dead end with nothing the user could do, the same failure shape Module
+10 calls out for the login page ("no dead ends... it throws the platform's
+raw error"), just not written down for this screen specifically since
+Module 10 is about login. Fixed: `callFunction` (`src/lib/functions.js`) now
+tags a caught error `isRouterError` — `true` when the router itself
+responded with a structured `{error: "..."}` (a real, actionable message
+like "ya tienes una familia"), `false` for anything that never reached
+router logic (function not registered, network failure, a 500).
+`FamilyOnboarding.jsx` shows router errors inline as before; anything else
+now renders a WhatsApp/correo escape hatch (WhatsApp works with zero backend
+dependency, same reasoning as Roseta's `#rf-fallback` in `acaciaco-site`)
+instead of the raw string.
+
+**The identical `setError(err.message)` pattern exists in `Login.jsx`,
+`Register.jsx`, `Account.jsx`, `Upload.jsx`, `Soporte.jsx`, and
+`ResetPassword.jsx`** — found while looking for this, not yet fixed. Same
+risk in all six: an unregistered/failed function call would show raw axios
+text there too. Carry this into whichever phase touches those files next,
+or do it as its own pass — it's the same three-line `isRouterError` branch
+in each place, just not done yet because six files is a bigger unilateral
+change than the one screen actually reported broken.

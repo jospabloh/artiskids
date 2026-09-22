@@ -2,13 +2,24 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
 import { callFunction } from "@/lib/functions";
-import { Users, Loader2, ArrowRight } from "lucide-react";
+import { Users, Loader2, ArrowRight, MessageCircle, Mail } from "lucide-react";
+
+const WHATSAPP = "449 895 8291";
+const WHATSAPP_HREF = "https://wa.me/524498958291";
+const EMAIL = "soporte@acaciaco.com.mx";
 
 // Module 18-retired's entry point: an authenticated user with no family_id
 // lands here (see the RequireFamily gate in App.jsx) and either creates a
 // family (becomes its family_admin) or joins one with a code (becomes a
 // member) -- both call the family function router, never a direct write,
 // since User.family_id/family_role are RLS-write-locked to admin.
+//
+// This is the very first screen an authenticated user can get stuck on, so
+// it follows Module 10's "no dead ends" rule even though that module is
+// written about login: a failure here must never show a raw platform error
+// with nothing the user can do about it. callFunction's isRouterError flag
+// tells the two submit handlers below which kind of failure they got --
+// see fatalError's own comment for the split.
 export default function FamilyOnboarding() {
   const navigate = useNavigate();
   const { checkUserAuth } = useAuth();
@@ -16,6 +27,13 @@ export default function FamilyOnboarding() {
   const [name, setName] = useState("");
   const [joinCode, setJoinCode] = useState("");
   const [error, setError] = useState("");
+  // Set only for a failure callFunction could not attribute to the router
+  // itself (function not deployed, network failure, a 500) -- something a
+  // "corrige el dato" message can't help with, so this renders the WhatsApp
+  // / correo escape hatch instead of the inline banner. Always available
+  // (unlike the in-app Soporte page, which itself depends on the same
+  // backend that just failed) since it's a plain external link.
+  const [fatalError, setFatalError] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const afterSuccess = async () => {
@@ -30,12 +48,14 @@ export default function FamilyOnboarding() {
     e.preventDefault();
     if (!name.trim()) return;
     setError("");
+    setFatalError(false);
     setLoading(true);
     try {
       await callFunction("family", "createFamily", { name: name.trim() });
       await afterSuccess();
     } catch (err) {
-      setError(err.message);
+      if (err.isRouterError) setError(err.message);
+      else setFatalError(true);
     } finally {
       setLoading(false);
     }
@@ -45,12 +65,14 @@ export default function FamilyOnboarding() {
     e.preventDefault();
     if (!joinCode.trim()) return;
     setError("");
+    setFatalError(false);
     setLoading(true);
     try {
       await callFunction("family", "redeemCode", { join_code: joinCode.trim().toUpperCase() });
       await afterSuccess();
     } catch (err) {
-      setError(err.message);
+      if (err.isRouterError) setError(err.message);
+      else setFatalError(true);
     } finally {
       setLoading(false);
     }
@@ -68,6 +90,38 @@ export default function FamilyOnboarding() {
         </div>
 
         <div className="bg-white rounded-2xl border border-stone-100 shadow-sm p-6">
+          {fatalError ? (
+            <div className="text-center space-y-4">
+              <p className="text-sm text-stone-600">
+                Algo no funcionó de nuestro lado y no pudimos {mode === "join" ? "unirte a la" : "crear tu"} familia.
+                No es algo que tú puedas corregir — escríbenos y te ayudamos directo.
+              </p>
+              <div className="space-y-2">
+                <a
+                  href={`${WHATSAPP_HREF}?text=${encodeURIComponent(`Hola, quiero ${mode === "join" ? "unirme a una familia con un código" : "crear mi familia"} en ArtisKids y me salió un error.`)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-emerald-500 text-white font-semibold hover:bg-emerald-600 transition"
+                >
+                  <MessageCircle className="w-4 h-4" /> WhatsApp: {WHATSAPP}
+                </a>
+                <a
+                  href={`mailto:${EMAIL}?subject=${encodeURIComponent("No puedo " + (mode === "join" ? "unirme a mi familia" : "crear mi familia") + " en ArtisKids")}`}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-stone-200 text-stone-600 font-semibold hover:bg-stone-50 transition"
+                >
+                  <Mail className="w-4 h-4" /> {EMAIL}
+                </a>
+              </div>
+              <button
+                type="button"
+                onClick={() => setFatalError(false)}
+                className="w-full text-sm text-stone-400 hover:text-stone-600"
+              >
+                Intentar de nuevo
+              </button>
+            </div>
+          ) : (
+          <>
           {error && (
             <div className="mb-4 p-3 rounded-lg bg-rose-50 text-rose-600 text-sm">{error}</div>
           )}
@@ -155,6 +209,8 @@ export default function FamilyOnboarding() {
                 Volver
               </button>
             </form>
+          )}
+          </>
           )}
         </div>
       </div>
