@@ -4,10 +4,11 @@ import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { LogIn, Mail, Lock, Loader2 } from "lucide-react";
+import { LogIn, Mail, Lock, Loader2, MessageCircle } from "lucide-react";
 import AuthLayout from "@/components/AuthLayout";
 import GoogleIcon from "@/components/GoogleIcon";
 import { safeReturnTo } from "@/lib/authReturnTo";
+import { WHATSAPP_HREF } from "@/components/SupportEscapeHatch";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -26,7 +27,12 @@ export default function Login() {
       await base44.auth.loginViaEmailPassword(email, password);
       window.location.href = returnTo;
     } catch (err) {
-      setError(err.message || "Invalid email or password");
+      // err.message here comes from Base44's own auth API (not our
+      // callFunction wrapper, so there's no isRouterError to branch on) --
+      // usually a real, actionable message ("Invalid credentials"), but
+      // there's no way to be sure from here, so the WhatsApp link below
+      // stays visible alongside it rather than replacing it outright.
+      setError(err.message || "Correo o contraseña incorrectos");
     } finally {
       setLoading(false);
     }
@@ -72,8 +78,16 @@ export default function Login() {
       </div>
 
       {error && (
-        <div className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
-          {error}
+        <div className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm space-y-2">
+          <p>{error}</p>
+          <a
+            href={`${WHATSAPP_HREF}?text=${encodeURIComponent("Hola, no puedo iniciar sesión en ArtisKids.")}`}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1.5 text-xs font-medium hover:underline"
+          >
+            <MessageCircle className="w-3.5 h-3.5" /> ¿Sigue sin funcionar? Escríbenos
+          </a>
         </div>
       )}
 

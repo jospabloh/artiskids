@@ -1,4 +1,6 @@
 {
+  "name": "purgeStaleSessions",
+  "entry": "entry.ts",
   // Hourly is plenty against a 48h threshold -- reaping late by under an
   // hour doesn't matter at that scale, and this keeps the job cheap.
   "type": "scheduled",

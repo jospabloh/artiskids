@@ -4,12 +4,34 @@ import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { UserPlus, Mail, Lock, Loader2 } from "lucide-react";
+import { UserPlus, Mail, Lock, Loader2, MessageCircle } from "lucide-react";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import AuthLayout from "@/components/AuthLayout";
 import GoogleIcon from "@/components/GoogleIcon";
 import { toast } from "@/components/ui/use-toast";
 import { safeReturnTo } from "@/lib/authReturnTo";
+import { WHATSAPP_HREF } from "@/components/SupportEscapeHatch";
+
+// err.message here comes straight from Base44's own auth API (no
+// isRouterError to branch on, unlike callFunction-based pages) -- usually a
+// real, actionable message, but there's no way to be sure from here, so the
+// WhatsApp link stays visible alongside it rather than replacing it.
+function ErrorBanner({ message, context }) {
+  if (!message) return null;
+  return (
+    <div className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm space-y-2">
+      <p>{message}</p>
+      <a
+        href={`${WHATSAPP_HREF}?text=${encodeURIComponent(context)}`}
+        target="_blank"
+        rel="noreferrer"
+        className="inline-flex items-center gap-1.5 text-xs font-medium hover:underline"
+      >
+        <MessageCircle className="w-3.5 h-3.5" /> ¿Sigue sin funcionar? Escríbenos
+      </a>
+    </div>
+  );
+}
 
 export default function Register() {
   const [email, setEmail] = useState("");
@@ -24,7 +46,7 @@ export default function Register() {
     e.preventDefault();
     setError("");
     if (password !== confirmPassword) {
-      setError("Passwords do not match");
+      setError("Las contraseñas no coinciden");
       return;
     }
     setLoading(true);
@@ -32,7 +54,7 @@ export default function Register() {
       await base44.auth.register({ email, password });
       setShowOtp(true);
     } catch (err) {
-      setError(err.message || "Registration failed");
+      setError(err.message || "No se pudo crear la cuenta");
     } finally {
       setLoading(false);
     }
@@ -48,7 +70,7 @@ export default function Register() {
       }
       window.location.href = safeReturnTo();
     } catch (err) {
-      setError(err.message || "Invalid verification code");
+      setError(err.message || "Código de verificación inválido");
     } finally {
       setLoading(false);
     }
@@ -63,7 +85,7 @@ export default function Register() {
         description: "Check your email for the new code.",
       });
     } catch (err) {
-      setError(err.message || "Failed to resend code");
+      setError(err.message || "No se pudo reenviar el código");
     }
   };
 
@@ -78,11 +100,7 @@ export default function Register() {
         title="Verify your email"
         subtitle={`We sent a code to ${email}`}
       >
-        {error && (
-          <div className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
-            {error}
-          </div>
-        )}
+        <ErrorBanner message={error} context="Hola, no puedo verificar mi correo en ArtisKids." />
         <div className="flex justify-center mb-6">
           <InputOTP
             maxLength={6}
@@ -160,11 +178,7 @@ export default function Register() {
         </div>
       </div>
 
-      {error && (
-        <div className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
-          {error}
-        </div>
-      )}
+      <ErrorBanner message={error} context="Hola, no puedo crear mi cuenta en ArtisKids." />
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-2">

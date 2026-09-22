@@ -1,5 +1,7 @@
 import { useState } from "react";
+import { useAuth } from "@/lib/AuthContext";
 import { callFunction } from "@/lib/functions";
+import { notifyMissionControl } from "@/lib/notifyMissionControl";
 import { LifeBuoy, MessageCircle, Mail, Loader2, CheckCircle2 } from "lucide-react";
 
 // Module 8's client half. WhatsApp and correo are always shown, not just on
@@ -10,6 +12,7 @@ const WHATSAPP_HREF = "https://wa.me/524498958291";
 const EMAIL = "soporte@acaciaco.com.mx";
 
 export default function Soporte() {
+  const { user } = useAuth();
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
@@ -25,7 +28,18 @@ export default function Soporte() {
       await callFunction("support", "createTicket", { subject: subject.trim(), message: message.trim() });
       setSent(true);
     } catch (err) {
-      setError(err.message);
+      if (err.isRouterError) {
+        setError(err.message);
+      } else {
+        // The ticket endpoint itself is unreachable -- reporting that
+        // failure through the same endpoint would be circular, so this is
+        // exactly the case notifyMissionControl exists for (its own public
+        // channel, no backend function involved). The WhatsApp/correo
+        // block below is already always visible, so the inline message
+        // just needs to point at it, not repeat it.
+        setError("No pudimos enviar tu mensaje por aquí. Usa WhatsApp o correo abajo.");
+        notifyMissionControl({ user, message: `No pudo enviar un mensaje de soporte en ArtisKids ("${subject.trim()}") -- error al llamar la función support.` });
+      }
     } finally {
       setLoading(false);
     }

@@ -1,18 +1,27 @@
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
+import { useAuth } from "@/lib/AuthContext";
 import { callFunction } from "@/lib/functions";
+import { notifyMissionControl } from "@/lib/notifyMissionControl";
+import SupportEscapeHatch from "@/components/SupportEscapeHatch";
 import { Image as ImageIcon, Loader2, Save } from "lucide-react";
 
 const ALBUM_SUGGESTIONS = ["Mis primeros trazos", "Animales", "La familia", "El cole", "Vacaciones", "Cumpleaños", "Otros"];
 
 export default function Upload() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
   const [form, setForm] = useState({ title: "", description: "", drawn_date: "", creator_name: "", album: "Otros" });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
+  // UploadPublicFile (not a callFunction call) and createDrawing's own
+  // non-router failures both land here -- neither is something the form's
+  // own fields can fix, so this replaces the form with the escape hatch
+  // instead of showing raw text under a "try again" that won't help.
+  const [fatalError, setFatalError] = useState(false);
   const [children, setChildren] = useState([]);
 
   useEffect(() => {
@@ -38,6 +47,7 @@ export default function Upload() {
     }
     setSubmitting(true);
     setError(null);
+    setFatalError(false);
     try {
       const { file_url } = await base44.integrations.Core.UploadPublicFile({ file });
       await callFunction("content", "createDrawing", {
@@ -47,7 +57,12 @@ export default function Upload() {
       });
       navigate("/");
     } catch (err) {
-      setError(err.message || "No se pudo guardar el dibujo. Inténtalo de nuevo.");
+      if (err.isRouterError) {
+        setError(err.message);
+      } else {
+        setFatalError(true);
+        notifyMissionControl({ user, message: `No pudo subir un dibujo en ArtisKids ("${form.title}") -- error al subir el archivo o llamar la función content.` });
+      }
       setSubmitting(false);
     }
   };
@@ -57,6 +72,22 @@ export default function Upload() {
       <h1 className="font-heading font-bold text-2xl text-stone-800 mb-1">Subir un dibujo</h1>
       <p className="text-sm text-stone-500 mb-6">Digitaliza la obra en alta calidad para preservarla para siempre.</p>
 
+      {fatalError ? (
+        <div className="bg-white rounded-2xl border border-stone-100 shadow-sm p-6 text-center space-y-4">
+          <p className="text-sm text-stone-600">
+            Algo no funcionó de nuestro lado y no pudimos guardar tu dibujo.
+            No es algo que tú puedas corregir — escríbenos y te ayudamos directo.
+          </p>
+          <SupportEscapeHatch contextMessage={`Hola, quiero subir el dibujo "${form.title}" en ArtisKids y me salió un error.`} />
+          <button
+            type="button"
+            onClick={() => setFatalError(false)}
+            className="w-full text-sm text-stone-400 hover:text-stone-600"
+          >
+            Intentar de nuevo
+          </button>
+        </div>
+      ) : (
       <form onSubmit={submit} className="space-y-5">
         {/* Dropzone / preview */}
         <label className="block">
@@ -151,6 +182,7 @@ export default function Upload() {
           {submitting ? "Guardando..." : "Guardar en la cápsula"}
         </button>
       </form>
+      )}
 
       <style>{`
         .input {

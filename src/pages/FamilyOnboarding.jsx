@@ -2,11 +2,9 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
 import { callFunction } from "@/lib/functions";
-import { Users, Loader2, ArrowRight, MessageCircle, Mail } from "lucide-react";
-
-const WHATSAPP = "449 895 8291";
-const WHATSAPP_HREF = "https://wa.me/524498958291";
-const EMAIL = "soporte@acaciaco.com.mx";
+import { notifyMissionControl } from "@/lib/notifyMissionControl";
+import SupportEscapeHatch from "@/components/SupportEscapeHatch";
+import { Users, Loader2, ArrowRight } from "lucide-react";
 
 // Module 18-retired's entry point: an authenticated user with no family_id
 // lands here (see the RequireFamily gate in App.jsx) and either creates a
@@ -22,7 +20,7 @@ const EMAIL = "soporte@acaciaco.com.mx";
 // see fatalError's own comment for the split.
 export default function FamilyOnboarding() {
   const navigate = useNavigate();
-  const { checkUserAuth } = useAuth();
+  const { user, checkUserAuth } = useAuth();
   const [mode, setMode] = useState(null); // null | "create" | "join"
   const [name, setName] = useState("");
   const [joinCode, setJoinCode] = useState("");
@@ -55,7 +53,10 @@ export default function FamilyOnboarding() {
       await afterSuccess();
     } catch (err) {
       if (err.isRouterError) setError(err.message);
-      else setFatalError(true);
+      else {
+        setFatalError(true);
+        notifyMissionControl({ user, message: "No pudo crear su familia en ArtisKids -- error al llamar la función family (probablemente no registrada en el backend todavía)." });
+      }
     } finally {
       setLoading(false);
     }
@@ -72,7 +73,10 @@ export default function FamilyOnboarding() {
       await afterSuccess();
     } catch (err) {
       if (err.isRouterError) setError(err.message);
-      else setFatalError(true);
+      else {
+        setFatalError(true);
+        notifyMissionControl({ user, message: "No pudo unirse a una familia con un código en ArtisKids -- error al llamar la función family (probablemente no registrada en el backend todavía)." });
+      }
     } finally {
       setLoading(false);
     }
@@ -96,22 +100,9 @@ export default function FamilyOnboarding() {
                 Algo no funcionó de nuestro lado y no pudimos {mode === "join" ? "unirte a la" : "crear tu"} familia.
                 No es algo que tú puedas corregir — escríbenos y te ayudamos directo.
               </p>
-              <div className="space-y-2">
-                <a
-                  href={`${WHATSAPP_HREF}?text=${encodeURIComponent(`Hola, quiero ${mode === "join" ? "unirme a una familia con un código" : "crear mi familia"} en ArtisKids y me salió un error.`)}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-emerald-500 text-white font-semibold hover:bg-emerald-600 transition"
-                >
-                  <MessageCircle className="w-4 h-4" /> WhatsApp: {WHATSAPP}
-                </a>
-                <a
-                  href={`mailto:${EMAIL}?subject=${encodeURIComponent("No puedo " + (mode === "join" ? "unirme a mi familia" : "crear mi familia") + " en ArtisKids")}`}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-stone-200 text-stone-600 font-semibold hover:bg-stone-50 transition"
-                >
-                  <Mail className="w-4 h-4" /> {EMAIL}
-                </a>
-              </div>
+              <SupportEscapeHatch
+                contextMessage={`Hola, quiero ${mode === "join" ? "unirme a una familia con un código" : "crear mi familia"} en ArtisKids y me salió un error.`}
+              />
               <button
                 type="button"
                 onClick={() => setFatalError(false)}
