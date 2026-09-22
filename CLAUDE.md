@@ -631,11 +631,17 @@ the other five → `401 {"error":"not authenticated"}` / `{"error":
 function's own code; a 400/401 with the function's own error shape only
 comes from code that is actually running.
 
-**What this unblocks**: `createFamily`/`redeemCode` (the `/bienvenida`
-404 from the screenshot earlier this session), uploads through the Safe
-path, sessions, and support tickets should all work now for a real
-authenticated user — not yet exercised end-to-end from this session
-(no browser here), so that's still the next real-world check: create or
-join a family, upload a drawing, open Account's member/session lists,
-submit a Soporte ticket. If any of those still fail, the failure is a new
-one — the "function not found" class is closed.
+**What this unblocked, confirmed live by the user in a real browser
+(2026-09-22, same day):** created a family, added children, and invited a
+spouse — `createFamily` (the exact `/bienvenida` 404 from the earlier
+screenshot), the children/`Parent`/`Relative` catalog writes, and the
+member-invite path (`join_code` flow) all work end-to-end against the
+deployed functions. This is the first real confirmation that the whole
+chain — RLS (Phase 2) → function router → permission registry (Phase 3) →
+frontend (Phase 4) — works together for an actual user, not just each
+layer in isolation.
+
+Still not exercised: uploading a drawing through the Safe path, Account's
+member/session lists and danger-zone actions, and a Soporte ticket
+submission. Those are the next real-world checks — the "function not
+found" class that blocked Phase 3 is closed either way.
