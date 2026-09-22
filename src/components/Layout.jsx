@@ -1,5 +1,5 @@
 import { Outlet, Link, useLocation } from "react-router-dom";
-import { Palette, Upload, Home as HomeIcon, Users, User, LifeBuoy, LogOut } from "lucide-react";
+import { Upload, Home as HomeIcon, Users, User, LifeBuoy, LogOut } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 
 const navItems = [
@@ -18,9 +18,8 @@ export default function Layout() {
       <header className="sticky top-0 z-30 bg-white/80 backdrop-blur border-b border-amber-100">
         <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-400 to-rose-400 flex items-center justify-center shadow-sm">
-              <Palette className="w-5 h-5 text-white" />
-            </div>
+            <img src="/logo.jpg" alt="ArtisKids" className="w-9 h-9 rounded-xl object-cover shadow-sm" />
+
             <div className="leading-tight">
               <div className="font-heading font-bold text-stone-800">Cápsula de Arte</div>
               <div className="text-[11px] text-stone-400 -mt-0.5">Recuerdos que duran para siempre</div>

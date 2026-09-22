@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
 import { callFunction } from "@/lib/functions";
-import { Palette, Users, Loader2, ArrowRight } from "lucide-react";
+import { Users, Loader2, ArrowRight } from "lucide-react";
 
 // Module 18-retired's entry point: an authenticated user with no family_id
 // lands here (see the RequireFamily gate in App.jsx) and either creates a
@@ -60,9 +60,7 @@ export default function FamilyOnboarding() {
     <div className="min-h-screen flex items-center justify-center bg-[#fdf8f3] px-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-br from-amber-400 to-rose-400 flex items-center justify-center shadow-sm mb-4">
-            <Palette className="w-7 h-7 text-white" />
-          </div>
+          <img src="/logo.jpg" alt="ArtisKids" className="w-14 h-14 mx-auto rounded-2xl object-cover shadow-sm mb-4" />
           <h1 className="font-heading font-bold text-2xl text-stone-800">Bienvenido a ArtisKids</h1>
           <p className="text-stone-500 mt-2 text-sm">
             Cada familia tiene su propia cápsula. Crea la tuya o únete con un código.
