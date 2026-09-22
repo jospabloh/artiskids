@@ -543,3 +543,38 @@ Verified: `npm run lint` (clean) and `npm run build` (succeeds) after every
 file; `npm run typecheck` still reports exactly 84 errors, matching a
 `git stash -u` baseline of the same repo state — zero new errors, all
 pre-existing shadcn/JS-in-TS prop-typing gaps unrelated to this change.
+
+### Asked Base44's own builder AI to enable backend functions — hung, no answer (2026-09-22)
+
+Tried the one remaining lever before accepting the dashboard is the only
+path: `POST /api/apps/{id}/chat` (the builder AI turn, not the REST API)
+asking it directly to register/enable the six functions. Precedent for
+this working existed in this same conversation thread — earlier today the
+user asked the same builder AI why Secrets wasn't in the panel, and it
+investigated (checked Configuración, confirmed absence) and gave a real
+answer: "genuinely not in your panel for this app... CLI is the only
+way... I've already flagged the missing panel option to the platform
+team." So a "this is a platform limitation, here's the workaround" answer
+was plausible.
+
+**It didn't get that far — the turn hung.** `status.state` stayed
+`"processing"` / `"Applying edit prompt"` for **17 minutes with zero
+change** (`last_updated_date` frozen at first read) and zero new messages
+ever appeared in `GET /chat/full-conversation` — not even the outbound
+prompt itself, let alone a reply or a tool call. Compare every other turn
+in this same conversation: all resolved in single-digit seconds. Stopped
+it with `POST /chat/stop`; the log now shows the sync-commits message
+from 17:06 followed directly by `<The user has stopped current
+generation>` — nothing in between. Not a "the answer wasn't what I
+wanted" outcome; the turn produced literally nothing before being killed.
+
+**Net: this route is exhausted, both directions.** The REST API has no
+documented operation for backend-function registration (confirmed
+2026-09-22 above), and the builder-AI chat path — sanctioned for exactly
+this class of platform-boundary question — hung rather than answering.
+Whoever picks this up next: don't re-try `edit_base44_app` expecting a
+different result without a reason to think the hang was transient: 17
+minutes of zero output is not a slow turn, it's a stuck one. The Base44
+dashboard itself (a human, logged in) is the only remaining path to find
+or confirm a Functions/Backend panel — this sandbox has no browser session
+for it.
