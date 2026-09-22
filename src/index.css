@@ -4,6 +4,12 @@
 
 @layer base {
   :root {
+    /* Module 12: ThemeSwitcher placement. No bottom nav/FAB in this app to
+       collide with, so the default corner needs no per-width adjustment --
+       re-check this if a bottom tab bar or floating action button is ever
+       added (see shared/theme/README.md). */
+    --theme-switcher-bottom: 1rem;
+    --theme-switcher-right: 1rem;
     --background: 0 0% 100%;
     --foreground: 0 0% 3.9%;
     --card: 0 0% 100%;
