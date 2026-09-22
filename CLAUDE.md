@@ -239,6 +239,46 @@ decisions followed from that:
 Full schema for both new decisions lives in `base44/entities/*.jsonc` as of
 this phase, deployed to the live app only after explicit sign-off.
 
+## GitHub sync incident and resolution (2026-09-22)
+
+Phase 2's live schema push (`update_entity_schema`) broke GitHub→Base44 sync
+for real: it applied every entity change live correctly, but its write-back
+of the corresponding `base44/entities/*.jsonc` file into the repo failed on
+6 of 7 calls, leaving Base44's own internal git history for those 8 files
+diverged from GitHub's — not a content difference (confirmed byte-identical
+at the time), a **history** one, and `POST /github/sync` returned
+`error: merge_conflict` naming exactly those files on every pull attempt
+after that, through all of Phase 1's Stripe/branding/scripts changes sitting
+merged-but-unsynced on GitHub.
+
+First attempt — rewriting the 8 repo files to match Base44's canonical
+(alphabetical) key order, on the theory that a byte-level mismatch was the
+cause — did NOT resolve it; the same `merge_conflict` recurred with the same
+8 files after that fix merged. That ruled out content mismatch as the actual
+cause and confirmed it was git-history shape, not current bytes.
+
+**What actually resolved it**: `POST /github/sync/resolve-conflicts` — hands
+the conflict to Base44's own AI builder for a turn (can take minutes; the
+tool call itself timed out client-side at 60s both times, but the work
+continued server-side regardless — confirmed via `last_git_commit_hash`
+changing and `builder_session_counter` incrementing between polls). A
+follow-up `POST /github/sync` then reported `synced: true`, 9 commits
+pulled cleanly. Verified by re-reading `package.json`/`index.html` from the
+sandbox afterward — Phase 1's changes were finally present. The resolver's
+only actual edit was cosmetic (em dashes → hyphens in entity field
+descriptions, its own commit `3f48794`); RLS semantics were unchanged,
+confirmed by re-running `validate:rls` (0 errors) and `list_entity_schemas`.
+
+**Lesson for Phase 3's own entity/function pushes**: if `update_entity_schema`
+or an equivalent push reports its GitHub write-back failed, don't assume a
+byte-level fix will clear a resulting `merge_conflict` — it won't, if the
+real cause is history divergence rather than content. Go straight to
+`resolve-conflicts`, expect it to run past the tool's own timeout, and
+verify completion by polling `GET /api/apps/{id}` for a changed
+`last_git_commit_hash`/`builder_session_counter` rather than trusting the
+timed-out call's (missing) response. Then confirm with a plain `sync` pull
+and a content read-back — never assume clean from the resolver call alone.
+
 Rules for whoever executes a later phase: never run `base44 deploy` on this
 repo — it has active GitHub sync, so a raw CLI deploy bypasses it and
 diverges from what's in git; publish only via the dashboard or a deploy
