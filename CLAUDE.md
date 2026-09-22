@@ -114,11 +114,18 @@ why they are frozen here before schema work starts.
   unverified from this session — check the Base44 auth panel before Phase 4
   ships the real login page, so it never shows a button for a provider that
   isn't configured (Module 10).
-- No real brand assets exist yet (logo, favicon, colour direction) — Phase 1
-  removed the default Base44 favicon link rather than point at a placeholder
-  that would need replacing anyway. `index.html` currently ships with no
-  favicon at all; add a real one (and the acaciaco-site page's images) once
-  brand assets exist, before Phase 6's cutover.
+- **Closed 2026-09-22**: the real logo (origami-crane mark, 1024×1024, from
+  `resources/artiskids_logo.png` on `main` — dropped in via the GitHub web UI,
+  not part of the compliance rollout's own commits) now lives at
+  `public/logo.jpg` and is wired into the favicon (`index.html`), the header
+  mark (`Layout.jsx`), and the two other spots that carried the same
+  gradient+`Palette`-icon placeholder (`About.jsx`, `FamilyOnboarding.jsx`).
+  `resources/` itself is a drop folder, not a source directory — nothing
+  there is referenced by path, so it isn't merged into this rollout's
+  branches. Colour direction is still whatever the mark implies (amber/rose
+  gradient elsewhere in the UI already reads compatibly); acaciaco-site's
+  marketing page picked up the same file in the same pass — see its own
+  CLAUDE.md.
 - `npm run typecheck` already had pre-existing errors in `Login.jsx`,
   `Register.jsx`, `OAuthConsent.jsx`, `ResetPassword.jsx` (unrouted scaffold
   pages, shadcn prop-typing gaps) and `Upload.jsx` (`UploadPublicFile` not in
@@ -269,10 +276,12 @@ content/schema, never by hash or by assuming a merge shipped.
    then a paid plan via Mercado Pago," no structure), and the marketing
    page's pricing section says exactly that instead of inventing numbers
    the way every other app page's three-tier grid does. No brand assets
-   exist for the marketing page either (logo, hero screenshot, OG image) —
-   it uses inline SVG for the mark, same pattern RADAR's homepage card
-   already uses, and falls back to the portfolio-wide `acacia-og.png`
-   rather than a link that would 404.
+   existed for the marketing page at the time — it used inline SVG for the
+   mark, same pattern RADAR's homepage card already uses, and fell back to
+   the portfolio-wide `acacia-og.png` rather than a link that would 404.
+   **The real logo landed 2026-09-22** (see below) and replaced that inline
+   SVG in both acaciaco-site's product mark and homepage card; the OG image
+   still falls back, since there's no wide lockup, only the square mark.
 
    `ticketControl.js` needed a real code change, not just a config entry:
    `SupportTicket` has a single `message` field, no reply-thread entity —

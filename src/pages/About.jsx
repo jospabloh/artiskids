@@ -1,5 +1,5 @@
 import { APP_VERSION, RELEASE_DATE, CHANGELOG } from "@/lib/appConfig";
-import { Palette, MessageCircle, Mail } from "lucide-react";
+import { MessageCircle, Mail } from "lucide-react";
 
 const WHATSAPP = "449 895 8291";
 const WHATSAPP_HREF = "https://wa.me/524498958291";
@@ -12,9 +12,7 @@ export default function About() {
   return (
     <div className="max-w-xl mx-auto space-y-6">
       <div className="text-center py-4">
-        <div className="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-br from-amber-400 to-rose-400 flex items-center justify-center shadow-sm mb-3">
-          <Palette className="w-7 h-7 text-white" />
-        </div>
+        <img src="/logo.jpg" alt="ArtisKids" className="w-14 h-14 mx-auto rounded-2xl object-cover shadow-sm mb-3" />
         <h1 className="font-heading font-bold text-2xl text-stone-800">ArtisKids</h1>
         <p className="text-sm text-stone-400 mt-1">
           Versión {APP_VERSION} · {RELEASE_DATE}
