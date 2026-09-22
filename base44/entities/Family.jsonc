@@ -53,6 +53,17 @@
       "description": "Display name for the family, e.g. \"Familia Herrera\".",
       "type": "string"
     },
+    "storage_used_bytes": {
+      "description": "Running total of Drawing.file_size_bytes across the family's drawings. Maintained only by content/entry.ts's createDrawing/deleteDrawing (increments/decrements it alongside the Drawing write) -- never client-writable, since a wrong value here either blocks uploads that should work or lets a family exceed its quota.",
+      "rls": {
+        "write": {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      },
+      "type": "number"
+    },
     "trial_end_at": {
       "description": "Set once at family creation (created_at + 30 days, server time). Write-locked so a member can't extend their own trial.",
       "format": "date-time",

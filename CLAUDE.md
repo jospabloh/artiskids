@@ -184,7 +184,8 @@ content/schema, never by hash or by assuming a merge shipped.
    creates a real family the sanctioned way, rather than being hand-created
    here through a side door.
 3. **Backend functions, Mission Control bridge, secrets — code-complete
-   2026-09-22, repo-only, not deployed.** `SupportTicket`/`AppSession`/
+   2026-09-22, functions deployed and live 2026-09-22 (see "Backend
+   functions deployed" below).** `SupportTicket`/`AppSession`/
    `RolePermission` entities (moved here from Phase 2), the `acaciaControl`
    bridge (`_acaciaSign.ts` copied unchanged from `shared/bridge/`,
    `ACCEPT_LEGACY_MASTER = false`), the `family`/`content`/`session`/
@@ -217,13 +218,12 @@ content/schema, never by hash or by assuming a merge shipped.
    `ticketControl.js` has no `artiskids` entry (verified directly, not
    assumed) -- both close in Phase 5.
 
-   **Still pauses before functions deploy and before secrets are set** in
-   Base44 (`INGEST_HMAC_SECRET`, `ACACIA_APP_SLUG=artiskids`,
-   `PLATFORM_OWNER_EMAIL`, `CRON_SECRET`) — those are the platform-owner
-   identity and the bridge trust root, and `INGEST_HMAC_SECRET` specifically
-   must match Mission Control's own value exactly; it can't be read back
-   from either side once set, so getting it from the user is the one step
-   here that has no verify-after-the-fact.
+   Secrets were confirmed present and matching via `base44 secrets list`
+   before deploy; functions were then deployed via `base44 functions
+   deploy` and confirmed live by curling each one directly (see "Backend
+   functions deployed" below) — the one step that had no
+   verify-after-the-fact (matching `INGEST_HMAC_SECRET` to Mission
+   Control's own value) is resolved: the bridge is live.
 4. **Frontend compliance — code-complete 2026-09-22, in PR #7, not deployed
    (same as Phase 3, nothing here can go live before that pause clears).**
    Real routed login/register/forgot/reset (dropping the `redirectToLogin`
@@ -578,3 +578,70 @@ minutes of zero output is not a slow turn, it's a stuck one. The Base44
 dashboard itself (a human, logged in) is the only remaining path to find
 or confirm a Functions/Backend panel — this sandbox has no browser session
 for it.
+
+### Backend functions deployed via `base44` CLI (2026-09-22) — closes Phase 3's real blocker
+
+Neither the REST API nor the builder-AI chat path (both above) could
+register the six functions. The CLI, run by the user directly (this
+session has no shell into the user's machine), had a third, narrower
+subcommand neither of the first two attempts tried: `base44 functions
+deploy`, scoped to functions only — not `base44 deploy`, which CLAUDE.md's
+own rules forbid here because this app has active GitHub sync and a raw
+CLI deploy of the whole project would bypass it. Before recommending it,
+confirmed the one thing that made it safe: `git status` clean (bar an
+unrelated `package-lock.json` diff) and `HEAD` == `origin/main`, so
+whatever the command deployed from the local tree was byte-identical to
+what GitHub sync had already placed in Base44's file tree — no divergence
+risk, same discipline as the entity-schema pushes elsewhere in this file.
+
+**First attempt failed on a real config bug, not a platform issue.**
+`purgeStaleSessions/function.jsonc` — the only function needing a
+`function.jsonc` at all, since it's `type: "scheduled"` and the other five
+are plain HTTP functions Base44 defaults from the directory name +
+`entry.ts` — had the cron fields (`schedule_mode`, `cron_expression`) but
+was missing the two fields the CLI's schema requires on every
+`function.jsonc` regardless of type: `name` and `entry`. Fixed
+(`"name": "purgeStaleSessions"`, `"entry": "entry.ts"`), committed, pushed
+through [PR #11](https://github.com/jospabloh/artiskids/pull/11) (already
+open for the dead-end-fix work), merged to `main`. The user pulled and
+re-ran.
+
+**Second attempt hit a platform concurrency limit, not a config or code
+issue.** `base44 functions deploy` with no names deploys all six in
+sequence but apparently doesn't wait for each to fully release its
+deployment lock before starting the next — `purgeStaleSessions` and
+`acaciaControl` deployed, the remaining four all failed with `Another
+deployment is in progress`. Retried them one name at a time
+(`base44 functions deploy content`, then `family`, `session`, `support`),
+each only after the previous one finished. The very first single-name
+retry (`content`) still hit the same lock error once, then succeeded ~90
+seconds later on a second try — consistent with the lock from the earlier
+batch attempt still draining, not a new problem.
+
+**Verified live by content, not by CLI exit code** (`base44 functions
+list` alone would only prove the CLI's own bookkeeping, not that Base44's
+router actually serves them) — curled all six function endpoints directly
+from inside the app's own sandbox
+(`https://base44.app/api/apps/{app_id}/functions/{name}`, unauthenticated
+POST). Every one now returns its **own router's** rejection instead of the
+platform's generic "Backend function not found or not deployed" 404:
+`acaciaControl` → `400 {"error":"missing ts/action/sig"}` (its HMAC gate),
+the other five → `401 {"error":"not authenticated"}` / `{"error":
+"unauthorized"}` (their auth gate). A 404 at that layer never reaches a
+function's own code; a 400/401 with the function's own error shape only
+comes from code that is actually running.
+
+**What this unblocked, confirmed live by the user in a real browser
+(2026-09-22, same day):** created a family, added children, and invited a
+spouse — `createFamily` (the exact `/bienvenida` 404 from the earlier
+screenshot), the children/`Parent`/`Relative` catalog writes, and the
+member-invite path (`join_code` flow) all work end-to-end against the
+deployed functions. This is the first real confirmation that the whole
+chain — RLS (Phase 2) → function router → permission registry (Phase 3) →
+frontend (Phase 4) — works together for an actual user, not just each
+layer in isolation.
+
+Still not exercised: uploading a drawing through the Safe path, Account's
+member/session lists and danger-zone actions, and a Soporte ticket
+submission. Those are the next real-world checks — the "function not
+found" class that blocked Phase 3 is closed either way.

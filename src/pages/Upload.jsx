@@ -54,6 +54,7 @@ export default function Upload() {
         ...form,
         drawn_date: form.drawn_date || new Date().toISOString().slice(0, 10),
         image_url: file_url,
+        file_size_bytes: file.size,
       });
       navigate("/");
     } catch (err) {

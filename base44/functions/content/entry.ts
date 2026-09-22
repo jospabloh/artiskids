@@ -9,6 +9,7 @@
 // before a write, the two things RLS alone can't do here (Module 3).
 import { createClientFromRequest } from "npm:@base44/sdk";
 import { defaultAllowed } from "./_permissions.generated.ts";
+import { quotaBytesFor } from "./_storageQuota.ts";
 
 const CATALOG_ENTITIES = new Set(["Child", "Parent", "Relative"]);
 
@@ -86,17 +87,33 @@ export default async function (req: Request): Promise<Response> {
         const title = String(p.title ?? "").trim();
         const creatorName = String(p.creator_name ?? "").trim();
         const imageUrl = String(p.image_url ?? "").trim();
+        const fileSizeBytes = Number(p.file_size_bytes ?? 0);
         if (!title || !creatorName || !imageUrl) {
           return badRequest("title, creator_name and image_url are required");
         }
+        if (!Number.isFinite(fileSizeBytes) || fileSizeBytes <= 0) {
+          return badRequest("file_size_bytes is required");
+        }
+
+        const family = await base44.asServiceRole.entities.Family.get(familyId);
+        const used = Number(family.storage_used_bytes ?? 0);
+        const quota = quotaBytesFor(family.billing_status as string | undefined);
+        if (used + fileSizeBytes > quota) {
+          return Response.json({ error: "storage quota exceeded" }, { status: 403 });
+        }
+
         const drawing = await base44.asServiceRole.entities.Drawing.create({
           family_id: familyId,
           title,
           creator_name: creatorName,
           image_url: imageUrl,
+          file_size_bytes: fileSizeBytes,
           description: p.description ? String(p.description) : undefined,
           drawn_date: p.drawn_date ? String(p.drawn_date) : undefined,
           album: p.album ? String(p.album) : undefined,
+        });
+        await base44.asServiceRole.entities.Family.update(familyId, {
+          storage_used_bytes: used + fileSizeBytes,
         });
         return Response.json({ ok: true, drawing });
       }
@@ -114,6 +131,13 @@ export default async function (req: Request): Promise<Response> {
         await base44.asServiceRole.entities.Comment.deleteMany({ drawing_id: id });
         await base44.asServiceRole.entities.Reaction.deleteMany({ drawing_id: id });
         await base44.asServiceRole.entities.Drawing.delete(id);
+
+        const family = await base44.asServiceRole.entities.Family.get(familyId);
+        const used = Number(family.storage_used_bytes ?? 0);
+        const freed = Number(drawing.file_size_bytes ?? 0);
+        await base44.asServiceRole.entities.Family.update(familyId, {
+          storage_used_bytes: Math.max(0, used - freed),
+        });
         return Response.json({ ok: true });
       }
 
