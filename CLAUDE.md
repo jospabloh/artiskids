@@ -176,16 +176,47 @@ content/schema, never by hash or by assuming a merge shipped.
    `User.family_id` stay unset until Phase 3's `createFamily` function
    creates a real family the sanctioned way, rather than being hand-created
    here through a side door.
-3. **Backend functions, Mission Control bridge, secrets** — `SupportTicket`/
-   `AppSession`/`RolePermission` entities (moved here from Phase 2), the
-   `acaciaControl` bridge (`_acaciaSign.ts` copied unchanged from
-   `shared/bridge/`, `ACCEPT_LEGACY_MASTER = false`), family/content/session/
-   support function routers, the permission registry + generator. Modules 3
-   (server half), 5, 7 (server half), 8 (server half), 15, 16, 20 (server
-   half), 22. **Pauses before functions deploy and before secrets are set**
-   in Base44 (`INGEST_HMAC_SECRET`, `ACACIA_APP_SLUG=artiskids`,
+3. **Backend functions, Mission Control bridge, secrets — code-complete
+   2026-09-22, repo-only, not deployed.** `SupportTicket`/`AppSession`/
+   `RolePermission` entities (moved here from Phase 2), the `acaciaControl`
+   bridge (`_acaciaSign.ts` copied unchanged from `shared/bridge/`,
+   `ACCEPT_LEGACY_MASTER = false`), the `family`/`content`/`session`/
+   `support` function routers, `purgeStaleSessions` (the Module 20 reap job),
+   the permission registry + generator. Modules 3 (server half), 5, 7
+   (server half), 8 (server half), 15, 16, 20 (server half), 22. All six
+   function directories `deno check` clean and `deno test` passes (10/10 on
+   `_acaciaSign.ts`'s vector, checked identical across its three copies --
+   `acaciaControl`, `family`, `support`); `validate:rls`/`validate:functions`
+   both pass. Each router's `_permissions.generated.ts` is committed
+   (`npm run generate:permissions`), not hand-written.
+
+   Two corrections made against the design notes below, caught before
+   anything deployed rather than after: `AppSession` was missing a stable
+   `device_id` field (`manageSession`'s find-or-create key needs a
+   per-browser UUID, not the human-readable `device` label, which isn't
+   unique per physical device) -- added and made required. `family`/`content`
+   route their role checks through `permissionRegistry.js`'s `Familia`/
+   `Dibujos`/`Comentarios`/`Reacciones`/`Catalogo` sections (platform owner →
+   `RolePermission` override → registry default), not hardcoded
+   `family_role === "family_admin"` checks -- the registry existed
+   specifically for this and a hardcoded check would have silently diverged
+   from it the first time someone edited one but not the other.
+
+   Two upstream gaps are written-for but not yet real, same shape as Module
+   1's new-tenant ping (fire-and-forget, swallowed on failure, harmless
+   until the other side exists): `family`'s `createFamily` pings Mission
+   Control with no receiver there yet, and `support`'s `createTicket` pushes
+   to `/api/ingest/ticket`, which 4xxs today because Mission Control's
+   `ticketControl.js` has no `artiskids` entry (verified directly, not
+   assumed) -- both close in Phase 5.
+
+   **Still pauses before functions deploy and before secrets are set** in
+   Base44 (`INGEST_HMAC_SECRET`, `ACACIA_APP_SLUG=artiskids`,
    `PLATFORM_OWNER_EMAIL`, `CRON_SECRET`) — those are the platform-owner
-   identity and the bridge trust root.
+   identity and the bridge trust root, and `INGEST_HMAC_SECRET` specifically
+   must match Mission Control's own value exactly; it can't be read back
+   from either side once set, so getting it from the user is the one step
+   here that has no verify-after-the-fact.
 4. **Frontend compliance** — real routed login/register/forgot/reset
    (dropping the `redirectToLogin` fallback to Base44's hosted login), the
    shared `ThemeSwitcher` copied unchanged, direct entity writes replaced by
