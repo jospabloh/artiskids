@@ -62,14 +62,16 @@ export default async function (req: Request): Promise<Response> {
   }
   if (!caller?.id) return Response.json({ error: "not authenticated" }, { status: 401 });
 
-  let body: { action?: string; params?: Record<string, unknown> };
+  let body: { action?: string; [key: string]: unknown };
   try {
     body = await req.json();
   } catch {
     return badRequest("invalid JSON body");
   }
-  const { action } = body;
-  const p = body.params ?? {};
+  // Flat body: { action, ...params } -- same convention as family/support,
+  // and the shape shared/session/useSessionManager.js already dictates for
+  // the session function (see the comment there).
+  const { action, ...p } = body;
 
   try {
     const fresh = await getFreshCaller(base44, caller.id);

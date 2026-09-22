@@ -28,14 +28,17 @@ export default async function (req: Request): Promise<Response> {
   }
   if (!caller?.id) return Response.json({ error: "not authenticated" }, { status: 401 });
 
-  let body: { action?: string; params?: Record<string, unknown> };
+  let body: { action?: string; [key: string]: unknown };
   try {
     body = await req.json();
   } catch {
     return badRequest("invalid JSON body");
   }
-  const { action } = body;
-  const p = body.params ?? {};
+  // Flat body, not {action, params: {...}} -- shared/session/useSessionManager.js
+  // and useActivityTracker.js (canonical, byte-identical, can't be edited here)
+  // call base44.functions.invoke('session', { action, device_id, device_name })
+  // with the rest of the params at the top level, so the server has to match.
+  const { action, ...p } = body;
 
   try {
     switch (action) {
