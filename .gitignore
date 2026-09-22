@@ -35,3 +35,7 @@ dist-ssr
 .env
 .vite
 base44/.app.jsonc
+
+# `deno test`/`deno check` against base44/functions/ generate this locally
+# for module resolution; Base44's own deploy resolves its own imports.
+deno.lock
