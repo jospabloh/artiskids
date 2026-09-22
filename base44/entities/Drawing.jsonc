@@ -1,29 +1,28 @@
 {
   "name": "Drawing",
-  "type": "object",
   "properties": {
-    "title": {
+    "album": {
+      "type": "string"
+    },
+    "creator_name": {
       "type": "string"
     },
     "description": {
       "type": "string"
     },
-    "image_url": {
-      "type": "string"
-    },
     "drawn_date": {
-      "type": "string",
-      "format": "date"
-    },
-    "creator_name": {
-      "type": "string"
-    },
-    "album": {
+      "format": "date",
       "type": "string"
     },
     "family_id": {
-      "type": "string",
-      "description": "Tenant boundary — the family this drawing belongs to."
+      "description": "Tenant boundary — the family this drawing belongs to.",
+      "type": "string"
+    },
+    "image_url": {
+      "type": "string"
+    },
+    "title": {
+      "type": "string"
     }
   },
   "required": [
@@ -32,29 +31,54 @@
     "creator_name"
   ],
   "rls": {
-    "read": {
-      "$or": [
-        { "data.family_id": "{{user.data.family_id}}" },
-        { "user_condition": { "role": "admin" } }
-      ]
-    },
     "create": {
       "$or": [
-        { "data.family_id": "{{user.data.family_id}}" },
-        { "user_condition": { "role": "admin" } }
-      ]
-    },
-    "update": {
-      "$or": [
-        { "data.family_id": "{{user.data.family_id}}" },
-        { "user_condition": { "role": "admin" } }
+        {
+          "data.family_id": "{{user.data.family_id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
       ]
     },
     "delete": {
       "$or": [
-        { "data.family_id": "{{user.data.family_id}}" },
-        { "user_condition": { "role": "admin" } }
+        {
+          "data.family_id": "{{user.data.family_id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "read": {
+      "$or": [
+        {
+          "data.family_id": "{{user.data.family_id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "data.family_id": "{{user.data.family_id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
       ]
     }
-  }
+  },
+  "type": "object"
 }

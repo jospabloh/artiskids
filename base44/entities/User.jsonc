@@ -1,32 +1,43 @@
 {
+  "name": "User",
   "properties": {
+    "family_id": {
+      "description": "The one family this user belongs to. This field IS the membership record (Module 18, retired 2026-09-10) — no separate Membership entity, no tenant switcher. Write-locked: only Phase 3's createFamily/redeemCode/setMemberRole functions (running as service role) may set it, never the user themselves.",
+      "rls": {
+        "write": {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      },
+      "type": "string"
+    },
+    "family_role": {
+      "description": "Role within family_id. Same write lock as family_id, same reasoning.",
+      "enum": [
+        "family_admin",
+        "member"
+      ],
+      "rls": {
+        "write": {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      },
+      "type": "string"
+    },
     "role": {
-      "type": "string",
       "description": "The role of the user in the app",
       "enum": [
         "admin",
         "user"
-      ]
-    },
-    "family_id": {
-      "type": "string",
-      "description": "The one family this user belongs to. This field IS the membership record (Module 18, retired 2026-09-10) — no separate Membership entity, no tenant switcher. Write-locked: only Phase 3's createFamily/redeemCode/setMemberRole functions (running as service role) may set it, never the user themselves.",
-      "rls": {
-        "write": { "user_condition": { "role": "admin" } }
-      }
-    },
-    "family_role": {
-      "type": "string",
-      "enum": ["family_admin", "member"],
-      "description": "Role within family_id. Same write lock as family_id, same reasoning.",
-      "rls": {
-        "write": { "user_condition": { "role": "admin" } }
-      }
+      ],
+      "type": "string"
     }
   },
   "required": [
     "role"
   ],
-  "name": "User",
   "type": "object"
 }

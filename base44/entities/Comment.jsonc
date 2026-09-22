@@ -1,19 +1,18 @@
 {
   "name": "Comment",
-  "type": "object",
   "properties": {
+    "author_name": {
+      "type": "string"
+    },
     "drawing_id": {
       "type": "string"
     },
-    "author_name": {
+    "family_id": {
+      "description": "Tenant boundary — must match the family_id of the drawing_id it comments on. Not cross-checked by RLS (RLS can't join to Drawing); the Phase 3 Safe function that creates a Comment re-derives it from the target drawing's own family_id, never trusting the client's value.",
       "type": "string"
     },
     "text": {
       "type": "string"
-    },
-    "family_id": {
-      "type": "string",
-      "description": "Tenant boundary — must match the family_id of the drawing_id it comments on. Not cross-checked by RLS (RLS can't join to Drawing); the Phase 3 Safe function that creates a Comment re-derives it from the target drawing's own family_id, never trusting the client's value."
     }
   },
   "required": [
@@ -22,29 +21,54 @@
     "text"
   ],
   "rls": {
-    "read": {
-      "$or": [
-        { "data.family_id": "{{user.data.family_id}}" },
-        { "user_condition": { "role": "admin" } }
-      ]
-    },
     "create": {
       "$or": [
-        { "data.family_id": "{{user.data.family_id}}" },
-        { "user_condition": { "role": "admin" } }
-      ]
-    },
-    "update": {
-      "$or": [
-        { "data.family_id": "{{user.data.family_id}}" },
-        { "user_condition": { "role": "admin" } }
+        {
+          "data.family_id": "{{user.data.family_id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
       ]
     },
     "delete": {
       "$or": [
-        { "data.family_id": "{{user.data.family_id}}" },
-        { "user_condition": { "role": "admin" } }
+        {
+          "data.family_id": "{{user.data.family_id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "read": {
+      "$or": [
+        {
+          "data.family_id": "{{user.data.family_id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "data.family_id": "{{user.data.family_id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
       ]
     }
-  }
+  },
+  "type": "object"
 }
