@@ -182,6 +182,12 @@ export default function Account() {
             {FAMILY_ROLE_LABELS[user?.family_role] || user?.family_role}
           </span>
         </div>
+        {family?.billing_status === "trial" && family?.trial_end_at && (
+          <p className="text-xs text-stone-400 mt-3">
+            Tu prueba vence el{" "}
+            {new Date(family.trial_end_at).toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" })}
+          </p>
+        )}
         {family?.join_code && (
           <p className="text-xs text-stone-400 mt-3">
             Código de invitación: <span className="font-mono font-semibold text-stone-600">{family.join_code}</span>
