@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { useAuth } from "@/lib/AuthContext";
 import { callFunction } from "@/lib/functions";
+import { notifyMissionControl } from "@/lib/notifyMissionControl";
+import SupportEscapeHatch from "@/components/SupportEscapeHatch";
 import { FAMILY_ROLE_LABELS, isFamilyAdmin } from "@/lib/rbac";
 import { Users, Download, Smartphone, ShieldAlert, Loader2, Trash2 } from "lucide-react";
 
@@ -24,9 +26,17 @@ export default function Account() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
+  // A load failure leaves nothing to render (no family/members/sessions),
+  // so it gets the full-page escape hatch rather than a banner over an
+  // empty page. An action (run()) failure is different -- the page still
+  // has valid data underneath, so that one stays a banner, just no longer
+  // showing raw text for a non-router failure.
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [actionFailed, setActionFailed] = useState(false);
 
   const load = async () => {
     setLoading(true);
+    setLoadFailed(false);
     try {
       const [fam, memberData, sessionData] = await Promise.all([
         base44.entities.Family.get(user.family_id),
@@ -37,7 +47,8 @@ export default function Account() {
       setMembers(memberData?.members ?? []);
       setSessions(sessionData?.sessions ?? []);
     } catch (err) {
-      setError(err.message);
+      setLoadFailed(true);
+      notifyMissionControl({ user, message: "No pudo cargar su página de cuenta en ArtisKids -- error al leer la familia o llamar las funciones family/session." });
     } finally {
       setLoading(false);
     }
@@ -50,11 +61,17 @@ export default function Account() {
 
   const run = async (key, action) => {
     setError("");
+    setActionFailed(false);
     setBusy(key);
     try {
       await action();
     } catch (err) {
-      setError(err.message);
+      if (err.isRouterError) {
+        setError(err.message);
+      } else {
+        setActionFailed(true);
+        notifyMissionControl({ user, message: `No pudo completar una acción de cuenta en ArtisKids (${key}) -- error al llamar una función.` });
+      }
     } finally {
       setBusy("");
     }
@@ -120,6 +137,21 @@ export default function Account() {
     return <div className="flex justify-center py-20"><div className="w-8 h-8 border-4 border-amber-200 border-t-amber-500 rounded-full animate-spin" /></div>;
   }
 
+  if (loadFailed) {
+    return (
+      <div className="max-w-md mx-auto bg-white rounded-2xl border border-stone-100 shadow-sm p-6 text-center space-y-4">
+        <p className="text-sm text-stone-600">
+          Algo no funcionó de nuestro lado y no pudimos cargar tu cuenta.
+          No es algo que tú puedas corregir — escríbenos y te ayudamos directo.
+        </p>
+        <SupportEscapeHatch contextMessage="Hola, no puedo cargar mi página de cuenta en ArtisKids." />
+        <button type="button" onClick={load} className="w-full text-sm text-stone-400 hover:text-stone-600">
+          Intentar de nuevo
+        </button>
+      </div>
+    );
+  }
+
   const soleAdmin = admin && members.filter((m) => m.family_role === "family_admin").length <= 1;
 
   return (
@@ -129,7 +161,16 @@ export default function Account() {
         <p className="text-sm text-stone-500">{user?.email}</p>
       </div>
 
-      {error && <div className="p-3 rounded-lg bg-rose-50 text-rose-600 text-sm">{error}</div>}
+      {actionFailed ? (
+        <div className="bg-white rounded-2xl border border-stone-100 shadow-sm p-5 space-y-3">
+          <p className="text-sm text-stone-600">
+            Algo no funcionó de nuestro lado. No es algo que tú puedas corregir — escríbenos y te ayudamos directo.
+          </p>
+          <SupportEscapeHatch contextMessage="Hola, algo falló al usar mi cuenta en ArtisKids." />
+        </div>
+      ) : (
+        error && <div className="p-3 rounded-lg bg-rose-50 text-rose-600 text-sm">{error}</div>
+      )}
 
       <section className="bg-white rounded-2xl border border-stone-100 shadow-sm p-5">
         <h2 className="font-heading font-semibold text-stone-800 mb-3">{family?.name}</h2>

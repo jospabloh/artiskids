@@ -445,14 +445,9 @@ now renders a WhatsApp/correo escape hatch (WhatsApp works with zero backend
 dependency, same reasoning as Roseta's `#rf-fallback` in `acaciaco-site`)
 instead of the raw string.
 
-**The identical `setError(err.message)` pattern exists in `Login.jsx`,
+**The identical `setError(err.message)` pattern also existed in `Login.jsx`,
 `Register.jsx`, `Account.jsx`, `Upload.jsx`, `Soporte.jsx`, and
-`ResetPassword.jsx`** — found while looking for this, not yet fixed. Same
-risk in all six: an unregistered/failed function call would show raw axios
-text there too. Carry this into whichever phase touches those files next,
-or do it as its own pass — it's the same three-line `isRouterError` branch
-in each place, just not done yet because six files is a bigger unilateral
-change than the one screen actually reported broken.
+`ResetPassword.jsx` — closed 2026-09-22, see below.**
 
 ### A human needs to find out too, not just the customer (2026-09-22)
 
@@ -483,3 +478,68 @@ matching its exact request contract. Once backend functions are registered
 and `createFamily` actually works, this call stops firing on its own (the
 `else` branch it lives in only runs for `!err.isRouterError`) — nothing to
 clean up afterward.
+
+### The other six files: closed (2026-09-22)
+
+Two shared pieces landed so the pattern didn't get re-invented six times:
+`src/components/SupportEscapeHatch.jsx` (the WhatsApp/correo button pair,
+parametrized by a context message) and `src/lib/notifyMissionControl.js`
+(the lead-ingest POST, factored out of `FamilyOnboarding.jsx` — that file
+now imports both instead of carrying its own copies).
+
+Three files go through `callFunction`, so they got the exact same
+`isRouterError` treatment as `FamilyOnboarding.jsx`:
+
+- **`Soporte.jsx`** already showed WhatsApp/correo unconditionally below the
+  form (Module 8's own "a form is a convenience, never the only door" rule)
+  — the only bug was the inline banner above it leaking raw text. A non-router
+  failure now shows a generic line pointing at the channels already visible,
+  instead of repeating them, plus a `notifyMissionControl` call (reporting a
+  ticket failure through the ticket endpoint would be circular).
+- **`Upload.jsx`** — the whole form swaps for the escape hatch on a fatal
+  error, since neither a failed `UploadPublicFile` (not a `callFunction`
+  call, so never router-tagged) nor a failed `createDrawing` is something a
+  form field can fix. Client-side validation ("sube una foto") stays a plain
+  inline message, untouched.
+- **`Account.jsx`** splits two ways: `load()` failing (family/members/
+  sessions) leaves nothing to render, so that gets a full-page escape hatch
+  with a retry button; the seven `run()`-based actions (role changes,
+  session revoke, export, both deletes) keep the page underneath and just
+  swap the top banner for the escape hatch on a non-router failure.
+
+**`Login.jsx`, `Register.jsx`, `ResetPassword.jsx` needed a different
+treatment, not the same one copy-pasted.** They call `base44.auth.*`
+directly, never `callFunction` — there is no `isRouterError` to branch on.
+Traced the SDK itself (`node_modules/@base44/sdk/dist/utils/axios-client.js`)
+to check whether that matters: it wraps failures in a `Base44Error` whose
+`.message` comes from `error.response.data.message` or `.detail` when the
+server provides one, falling back to axios's own generic text only when it
+doesn't. That means a real auth rejection ("Invalid credentials") is
+probably already a clean, human message — hiding it behind a support panel
+the way `FamilyOnboarding.jsx` does would be a regression, not a fix.
+But **empirically this doesn't always hold**: the `family` function's own
+404 has a `.message` field by this same logic, and `FamilyOnboarding.jsx`
+still received axios's raw text in production (the original bug report) —
+so `base44.functions.invoke()` evidently doesn't take the exact path this
+SDK file's interceptor describes, and there's no way to verify auth calls
+do either without live-testing both. Given that uncertainty, these three
+keep showing `err.message` as before (translated fallback strings to
+Spanish — they were the one place in this pass still defaulting to
+English) and gained a persistent, low-key "¿Sigue sin funcionar? Escríbenos"
+WhatsApp link next to the error, rather than either fully trusting or fully
+hiding a message this codebase can't currently tell the shape of.
+
+**Not done, and out of scope for this pass**: `Login.jsx`/`Register.jsx`'s
+*entire* UI — headings, labels, buttons, not just the error fallbacks — is
+in English (`"Welcome back"`, `"Continue with Google"`, `"Forgot
+password?"`, etc.), which is the live, routed page per `discovered_routes`
+on the deployed app, not an unrouted scaffold. That's a real, separate
+violation of the portfolio's "every user-facing string in Spanish" rule,
+found while looking for the narrower dead-end fix. Worth its own pass —
+translating a whole page's copy is a deliberate content task, not a
+three-line branch.
+
+Verified: `npm run lint` (clean) and `npm run build` (succeeds) after every
+file; `npm run typecheck` still reports exactly 84 errors, matching a
+`git stash -u` baseline of the same repo state — zero new errors, all
+pre-existing shadcn/JS-in-TS prop-typing gaps unrelated to this change.

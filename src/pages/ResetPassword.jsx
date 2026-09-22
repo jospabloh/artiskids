@@ -4,8 +4,9 @@ import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Lock, Loader2, AlertTriangle } from "lucide-react";
+import { Lock, Loader2, AlertTriangle, MessageCircle } from "lucide-react";
 import AuthLayout from "@/components/AuthLayout";
+import { WHATSAPP_HREF } from "@/components/SupportEscapeHatch";
 
 export default function ResetPassword() {
   const [searchParams] = useSearchParams();
@@ -20,7 +21,7 @@ export default function ResetPassword() {
     e.preventDefault();
     setError("");
     if (newPassword !== confirmPassword) {
-      setError("Passwords do not match");
+      setError("Las contraseñas no coinciden");
       return;
     }
     setLoading(true);
@@ -28,7 +29,11 @@ export default function ResetPassword() {
       await base44.auth.resetPassword({ resetToken, newPassword });
       window.location.href = "/login";
     } catch (err) {
-      setError(err.message || "Failed to reset password");
+      // err.message here comes from Base44's own auth API (no isRouterError
+      // to branch on, unlike callFunction-based pages) -- usually a real,
+      // actionable message, but there's no way to be sure from here, so the
+      // WhatsApp link stays visible alongside it rather than replacing it.
+      setError(err.message || "No se pudo restablecer la contraseña");
     } finally {
       setLoading(false);
     }
@@ -60,8 +65,16 @@ export default function ResetPassword() {
       subtitle="Enter your new password below"
     >
       {error && (
-        <div className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
-          {error}
+        <div className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm space-y-2">
+          <p>{error}</p>
+          <a
+            href={`${WHATSAPP_HREF}?text=${encodeURIComponent("Hola, no puedo restablecer mi contraseña en ArtisKids.")}`}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1.5 text-xs font-medium hover:underline"
+          >
+            <MessageCircle className="w-3.5 h-3.5" /> ¿Sigue sin funcionar? Escríbenos
+          </a>
         </div>
       )}
       <form onSubmit={handleSubmit} className="space-y-4">

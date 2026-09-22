@@ -2,41 +2,9 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
 import { callFunction } from "@/lib/functions";
-import { Users, Loader2, ArrowRight, MessageCircle, Mail } from "lucide-react";
-
-const WHATSAPP = "449 895 8291";
-const WHATSAPP_HREF = "https://wa.me/524498958291";
-const EMAIL = "soporte@acaciaco.com.mx";
-
-// Mission Control's public lead ingest -- CORS-open, secret optional (see
-// jospabloh/acacia-mission-control's api/ingest/lead.js and .env.example:
-// "Optional: unset, the endpoint accepts any caller, same as today"), built
-// for exactly this -- any portfolio frontend posting directly from the
-// browser, no server hop needed. Used here so a stuck customer reaches a
-// human even if they never tap the WhatsApp/correo buttons below: the
-// in-app Soporte ticket path goes through the same backend functions that
-// are already down, so it can't be the signal of record while that's true.
-// Fire-and-forget on purpose -- Module 8's rule that a notification failing
-// must never cost the customer anything applies here too, and there is
-// nothing else for this call to cost.
-async function notifyMissionControl(mode, user) {
-  try {
-    await fetch("https://control.acaciaco.com.mx/api/ingest/lead", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        source: "artiskids.acaciaco.com.mx (bienvenida)",
-        app_interest: "artiskids",
-        type: "soporte",
-        name: user?.full_name || user?.email || "Usuario de ArtisKids",
-        email: user?.email,
-        message: `No pudo ${mode === "join" ? "unirse a una familia con un código" : "crear su familia"} en ArtisKids -- error al llamar la función family (probablemente no registrada en el backend todavía).`,
-      }),
-    });
-  } catch {
-    // Best-effort -- see the comment above this function.
-  }
-}
+import { notifyMissionControl } from "@/lib/notifyMissionControl";
+import SupportEscapeHatch from "@/components/SupportEscapeHatch";
+import { Users, Loader2, ArrowRight } from "lucide-react";
 
 // Module 18-retired's entry point: an authenticated user with no family_id
 // lands here (see the RequireFamily gate in App.jsx) and either creates a
@@ -85,7 +53,10 @@ export default function FamilyOnboarding() {
       await afterSuccess();
     } catch (err) {
       if (err.isRouterError) setError(err.message);
-      else { setFatalError(true); notifyMissionControl("create", user); }
+      else {
+        setFatalError(true);
+        notifyMissionControl({ user, message: "No pudo crear su familia en ArtisKids -- error al llamar la función family (probablemente no registrada en el backend todavía)." });
+      }
     } finally {
       setLoading(false);
     }
@@ -102,7 +73,10 @@ export default function FamilyOnboarding() {
       await afterSuccess();
     } catch (err) {
       if (err.isRouterError) setError(err.message);
-      else { setFatalError(true); notifyMissionControl("join", user); }
+      else {
+        setFatalError(true);
+        notifyMissionControl({ user, message: "No pudo unirse a una familia con un código en ArtisKids -- error al llamar la función family (probablemente no registrada en el backend todavía)." });
+      }
     } finally {
       setLoading(false);
     }
@@ -126,22 +100,9 @@ export default function FamilyOnboarding() {
                 Algo no funcionó de nuestro lado y no pudimos {mode === "join" ? "unirte a la" : "crear tu"} familia.
                 No es algo que tú puedas corregir — escríbenos y te ayudamos directo.
               </p>
-              <div className="space-y-2">
-                <a
-                  href={`${WHATSAPP_HREF}?text=${encodeURIComponent(`Hola, quiero ${mode === "join" ? "unirme a una familia con un código" : "crear mi familia"} en ArtisKids y me salió un error.`)}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-emerald-500 text-white font-semibold hover:bg-emerald-600 transition"
-                >
-                  <MessageCircle className="w-4 h-4" /> WhatsApp: {WHATSAPP}
-                </a>
-                <a
-                  href={`mailto:${EMAIL}?subject=${encodeURIComponent("No puedo " + (mode === "join" ? "unirme a mi familia" : "crear mi familia") + " en ArtisKids")}`}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-stone-200 text-stone-600 font-semibold hover:bg-stone-50 transition"
-                >
-                  <Mail className="w-4 h-4" /> {EMAIL}
-                </a>
-              </div>
+              <SupportEscapeHatch
+                contextMessage={`Hola, quiero ${mode === "join" ? "unirme a una familia con un código" : "crear mi familia"} en ArtisKids y me salió un error.`}
+              />
               <button
                 type="button"
                 onClick={() => setFatalError(false)}
