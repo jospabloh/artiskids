@@ -8,7 +8,7 @@
       "type": "string"
     },
     "family_id": {
-      "description": "Tenant boundary \u2014 must match the family_id of the drawing_id it comments on. Not cross-checked by RLS (RLS can't join to Drawing); the Phase 3 Safe function that creates a Comment re-derives it from the target drawing's own family_id, never trusting the client's value.",
+      "description": "Tenant boundary - must match the family_id of the drawing_id it comments on. Not cross-checked by RLS (RLS can't join to Drawing); the Phase 3 Safe function that creates a Comment re-derives it from the target drawing's own family_id, never trusting the client's value.",
       "type": "string"
     },
     "text": {

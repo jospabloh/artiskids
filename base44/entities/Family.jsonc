@@ -2,7 +2,7 @@
   "name": "Family",
   "properties": {
     "billing_status": {
-      "description": "Governs what the family can do (Module 1). Write-locked: only Mission Control's unified license cron or this app's own service-role functions may set it \u2014 never a family member, regardless of role.",
+      "description": "Governs what the family can do (Module 1). Write-locked: only Mission Control's unified license cron or this app's own service-role functions may set it - never a family member, regardless of role.",
       "enum": [
         "trial",
         "active",
@@ -39,7 +39,7 @@
       "type": "string"
     },
     "license_plan": {
-      "description": "Mercado Pago plan id once billing_status leaves trial. Null during trial. Same write lock as billing_status \u2014 set only by the billing function.",
+      "description": "Mercado Pago plan id once billing_status leaves trial. Null during trial. Same write lock as billing_status - set only by the billing function.",
       "rls": {
         "write": {
           "user_condition": {

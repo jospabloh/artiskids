@@ -15,7 +15,7 @@
       "type": "string"
     },
     "family_id": {
-      "description": "Tenant boundary \u2014 the family this drawing belongs to.",
+      "description": "Tenant boundary - the family this drawing belongs to.",
       "type": "string"
     },
     "image_url": {

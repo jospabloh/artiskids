@@ -2,7 +2,7 @@
   "name": "User",
   "properties": {
     "family_id": {
-      "description": "The one family this user belongs to. This field IS the membership record (Module 18, retired 2026-09-10) \u2014 no separate Membership entity, no tenant switcher. Write-locked: only Phase 3's createFamily/redeemCode/setMemberRole functions (running as service role) may set it, never the user themselves.",
+      "description": "The one family this user belongs to. This field IS the membership record (Module 18, retired 2026-09-10) - no separate Membership entity, no tenant switcher. Write-locked: only Phase 3's createFamily/redeemCode/setMemberRole functions (running as service role) may set it, never the user themselves.",
       "rls": {
         "write": {
           "user_condition": {

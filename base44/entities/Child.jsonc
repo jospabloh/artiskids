@@ -6,7 +6,7 @@
       "type": "string"
     },
     "family_id": {
-      "description": "Tenant boundary \u2014 the family this child profile belongs to.",
+      "description": "Tenant boundary - the family this child profile belongs to.",
       "type": "string"
     },
     "name": {
