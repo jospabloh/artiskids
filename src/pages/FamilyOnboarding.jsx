@@ -8,6 +8,36 @@ const WHATSAPP = "449 895 8291";
 const WHATSAPP_HREF = "https://wa.me/524498958291";
 const EMAIL = "soporte@acaciaco.com.mx";
 
+// Mission Control's public lead ingest -- CORS-open, secret optional (see
+// jospabloh/acacia-mission-control's api/ingest/lead.js and .env.example:
+// "Optional: unset, the endpoint accepts any caller, same as today"), built
+// for exactly this -- any portfolio frontend posting directly from the
+// browser, no server hop needed. Used here so a stuck customer reaches a
+// human even if they never tap the WhatsApp/correo buttons below: the
+// in-app Soporte ticket path goes through the same backend functions that
+// are already down, so it can't be the signal of record while that's true.
+// Fire-and-forget on purpose -- Module 8's rule that a notification failing
+// must never cost the customer anything applies here too, and there is
+// nothing else for this call to cost.
+async function notifyMissionControl(mode, user) {
+  try {
+    await fetch("https://control.acaciaco.com.mx/api/ingest/lead", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        source: "artiskids.acaciaco.com.mx (bienvenida)",
+        app_interest: "artiskids",
+        type: "soporte",
+        name: user?.full_name || user?.email || "Usuario de ArtisKids",
+        email: user?.email,
+        message: `No pudo ${mode === "join" ? "unirse a una familia con un código" : "crear su familia"} en ArtisKids -- error al llamar la función family (probablemente no registrada en el backend todavía).`,
+      }),
+    });
+  } catch {
+    // Best-effort -- see the comment above this function.
+  }
+}
+
 // Module 18-retired's entry point: an authenticated user with no family_id
 // lands here (see the RequireFamily gate in App.jsx) and either creates a
 // family (becomes its family_admin) or joins one with a code (becomes a
@@ -22,7 +52,7 @@ const EMAIL = "soporte@acaciaco.com.mx";
 // see fatalError's own comment for the split.
 export default function FamilyOnboarding() {
   const navigate = useNavigate();
-  const { checkUserAuth } = useAuth();
+  const { user, checkUserAuth } = useAuth();
   const [mode, setMode] = useState(null); // null | "create" | "join"
   const [name, setName] = useState("");
   const [joinCode, setJoinCode] = useState("");
@@ -55,7 +85,7 @@ export default function FamilyOnboarding() {
       await afterSuccess();
     } catch (err) {
       if (err.isRouterError) setError(err.message);
-      else setFatalError(true);
+      else { setFatalError(true); notifyMissionControl("create", user); }
     } finally {
       setLoading(false);
     }
@@ -72,7 +102,7 @@ export default function FamilyOnboarding() {
       await afterSuccess();
     } catch (err) {
       if (err.isRouterError) setError(err.message);
-      else setFatalError(true);
+      else { setFatalError(true); notifyMissionControl("join", user); }
     } finally {
       setLoading(false);
     }

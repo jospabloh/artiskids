@@ -453,3 +453,33 @@ text there too. Carry this into whichever phase touches those files next,
 or do it as its own pass — it's the same three-line `isRouterError` branch
 in each place, just not done yet because six files is a bigger unilateral
 change than the one screen actually reported broken.
+
+### A human needs to find out too, not just the customer (2026-09-22)
+
+The WhatsApp/correo escape hatch only helps if the customer actually taps
+it. `FamilyOnboarding.jsx`'s fatal-error path now also fires
+`notifyMissionControl()` — a fire-and-forget `POST` straight from the
+browser to `https://control.acaciaco.com.mx/api/ingest/lead`
+(`type: "soporte"`, `app_interest: "artiskids"`, the caller's own
+email/name, a message naming which action failed). This is Mission
+Control's existing **public** lead endpoint (`api/ingest/lead.js` there) —
+CORS-open, secret optional, built for exactly this: "the acaciaco.com.mx
+contact form (and any landing) can POST a lead here." No new secret, no env
+var, nothing server-side to configure.
+
+**Why not the `support` function's `createTicket` instead** (Module 8's
+usual path): it goes through the same six backend functions that are
+already down — using it here would be reporting a backend outage through
+the backend that's out. `leads` (a sales/support inbox, not a ticket) is
+the one channel in the whole portfolio a pre-auth, family-less, backend-less
+customer can still reach, because it was built to be called directly from a
+browser with nothing behind it.
+
+Not verified live from this sandbox — its proxy can't reach
+`control.acaciaco.com.mx` (same limitation the smoke-test docs already
+name). Verified instead by reading `api/ingest/lead.js` and its
+`.env.example` entry directly in `jospabloh/acacia-mission-control` and
+matching its exact request contract. Once backend functions are registered
+and `createFamily` actually works, this call stops firing on its own (the
+`else` branch it lives in only runs for `!err.isRouterError`) — nothing to
+clean up afterward.
