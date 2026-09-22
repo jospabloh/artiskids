@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
+import { callFunction } from "@/lib/functions";
 import { Image as ImageIcon, Loader2, Save } from "lucide-react";
 
 const ALBUM_SUGGESTIONS = ["Mis primeros trazos", "Animales", "La familia", "El cole", "Vacaciones", "Cumpleaños", "Otros"];
@@ -39,14 +40,14 @@ export default function Upload() {
     setError(null);
     try {
       const { file_url } = await base44.integrations.Core.UploadPublicFile({ file });
-      await base44.entities.Drawing.create({
+      await callFunction("content", "createDrawing", {
         ...form,
         drawn_date: form.drawn_date || new Date().toISOString().slice(0, 10),
         image_url: file_url,
       });
       navigate("/");
     } catch (err) {
-      setError("No se pudo guardar el dibujo. Inténtalo de nuevo.");
+      setError(err.message || "No se pudo guardar el dibujo. Inténtalo de nuevo.");
       setSubmitting(false);
     }
   };

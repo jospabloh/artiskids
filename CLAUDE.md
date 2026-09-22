@@ -217,12 +217,42 @@ content/schema, never by hash or by assuming a merge shipped.
    must match Mission Control's own value exactly; it can't be read back
    from either side once set, so getting it from the user is the one step
    here that has no verify-after-the-fact.
-4. **Frontend compliance** — real routed login/register/forgot/reset
-   (dropping the `redirectToLogin` fallback to Base44's hosted login), the
-   shared `ThemeSwitcher` copied unchanged, direct entity writes replaced by
-   function calls, Account/Permisos/Soporte/About pages, session idle
-   warning + device list. Modules 10, 12, 3 (client), 7 (UI), 8 (UI), 20
-   (client), 21, 23, 6 (surfacing).
+4. **Frontend compliance — code-complete 2026-09-22, in PR #7, not deployed
+   (same as Phase 3, nothing here can go live before that pause clears).**
+   Real routed login/register/forgot/reset (dropping the `redirectToLogin`
+   fallback to Base44's hosted login), the shared `ThemeSwitcher` copied
+   unchanged, direct entity writes replaced by function calls, Account/
+   Permisos/Soporte/About pages, session idle warning + device list. Modules
+   10, 12, 3 (client), 7 (UI), 8 (UI), 20 (client), 21, 23, 6 (surfacing).
+   `npm run lint`/`typecheck`/`build`/`validate:rls`/`validate:functions` all
+   pass; `typecheck`'s remaining errors are the pre-existing scaffold ones
+   from Phase 0 (verified by diffing against a `git stash -u` baseline, not
+   assumed) plus zero new ones.
+
+   Two real bugs caught before they ever shipped, same discipline as
+   Phase 3's device_id fix: the request-body shape all four function
+   routers expected (`{action, params: {...}}`) didn't match what
+   `shared/session/useSessionManager.js`/`useActivityTracker.js` -- copied
+   unchanged, can't be edited here -- actually send (`{action, ...flat}`);
+   and `Account.jsx`'s member list and device list had no read path at all
+   (`User.read` is Base44's built-in "your own row only" default, no
+   entity-level RLS override on it), so `listMembers`/`listSessions`/
+   `revokeSession` were added to the family/session routers.
+
+   **Module 23 (nav persistence)**: this app's nav is a flat top bar with no
+   sidebar or expand/collapse state -- the active item is derived from the
+   URL via `useLocation()`, which survives a reload for free. Nothing extra
+   to build here unless the nav ever grows a collapsible section.
+
+   **Still unverified, carried from Phase 0's "known gaps"**: which OAuth
+   providers are actually enabled on the live Base44 app (Google shows a
+   button in `Login.jsx`/`Register.jsx` regardless -- check the Base44 auth
+   panel before Phase 6's cutover, or a configured-off provider 404s on
+   click). Also genuinely unverified from this sandbox: the whole flow in a
+   real browser (create/join family, upload, theme toggle, the 20-minute
+   idle warning, an admin's danger-zone actions) -- this environment's proxy
+   can't reach a live Base44 preview, so that's Phase 6's `npm run
+   test:smoke`-equivalent manual pass, not something claimed done here.
 5. **Mission Control + acaciaco-site** — registry migration (`url: null`),
    `licenseControl.js`/`ticketControl.js`/`messaging.js` entries +
    `licenseCatalog.js` mirror, `apps/artiskids.html` +

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { base44 } from "@/api/base44Client";
+import { callFunction } from "@/lib/functions";
 import { Plus, Trash2 } from "lucide-react";
 
 export default function CatalogList({ entityName, label, fields, accent = "amber" }) {
@@ -19,13 +20,13 @@ export default function CatalogList({ entityName, label, fields, accent = "amber
     if (!form[fields[0].key]?.trim()) return;
     const data = { ...form };
     fields.forEach((f) => { if (f.type === "date" && !data[f.key]) data[f.key] = undefined; });
-    await base44.entities[entityName].create(data);
+    await callFunction("content", "createCatalogEntry", { entity: entityName, data });
     setForm(Object.fromEntries(fields.map((f) => [f.key, ""])));
     load();
   };
 
   const remove = async (id) => {
-    await base44.entities[entityName].delete(id);
+    await callFunction("content", "deleteCatalogEntry", { entity: entityName, id });
     load();
   };
 

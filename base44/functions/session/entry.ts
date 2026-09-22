@@ -28,14 +28,17 @@ export default async function (req: Request): Promise<Response> {
   }
   if (!caller?.id) return Response.json({ error: "not authenticated" }, { status: 401 });
 
-  let body: { action?: string; params?: Record<string, unknown> };
+  let body: { action?: string; [key: string]: unknown };
   try {
     body = await req.json();
   } catch {
     return badRequest("invalid JSON body");
   }
-  const { action } = body;
-  const p = body.params ?? {};
+  // Flat body, not {action, params: {...}} -- shared/session/useSessionManager.js
+  // and useActivityTracker.js (canonical, byte-identical, can't be edited here)
+  // call base44.functions.invoke('session', { action, device_id, device_name })
+  // with the rest of the params at the top level, so the server has to match.
+  const { action, ...p } = body;
 
   try {
     switch (action) {
@@ -137,6 +140,35 @@ export default async function (req: Request): Promise<Response> {
             last_active_at: new Date().toISOString(),
           });
         }
+        return Response.json({ ok: true });
+      }
+
+      case "listSessions": {
+        // The Account page's device list -- the caller's own sessions only,
+        // never the rest of the family (a device belongs to a person, not
+        // the tenant, even though AppSession.family_id is the RLS boundary).
+        const fresh = await getFreshCaller(base44, caller.id);
+        if (!fresh.family_id) return Response.json({ sessions: [] });
+        const sessions = await base44.asServiceRole.entities.AppSession.filter(
+          { family_id: fresh.family_id, user_email: fresh.email },
+          "-last_active_at",
+        );
+        return Response.json({ sessions });
+      }
+
+      case "revokeSession": {
+        const sessionId = String(p.session_id ?? "");
+        if (!sessionId) return badRequest("session_id is required");
+        const fresh = await getFreshCaller(base44, caller.id);
+        const session = await base44.asServiceRole.entities.AppSession.get(sessionId);
+        if (!fresh.family_id || session.family_id !== fresh.family_id || session.user_email !== fresh.email) {
+          return Response.json({ error: "not your session" }, { status: 403 });
+        }
+        await base44.asServiceRole.entities.AppSession.update(sessionId, {
+          status: "revoked",
+          revoked_at: new Date().toISOString(),
+          revoked_by: fresh.email,
+        });
         return Response.json({ ok: true });
       }
 

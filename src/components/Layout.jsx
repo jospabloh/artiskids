@@ -1,14 +1,18 @@
 import { Outlet, Link, useLocation } from "react-router-dom";
-import { Palette, Upload, Home as HomeIcon, Users } from "lucide-react";
+import { Palette, Upload, Home as HomeIcon, Users, User, LifeBuoy, LogOut } from "lucide-react";
+import { useAuth } from "@/lib/AuthContext";
 
 const navItems = [
   { to: "/", label: "Inicio", icon: HomeIcon },
   { to: "/subir", label: "Subir dibujo", icon: Upload },
   { to: "/familia", label: "Familia", icon: Users },
+  { to: "/soporte", label: "Soporte", icon: LifeBuoy },
+  { to: "/cuenta", label: "Mi cuenta", icon: User },
 ];
 
 export default function Layout() {
   const location = useLocation();
+  const { logout } = useAuth();
   return (
     <div className="min-h-screen bg-[#fdf8f3] flex flex-col">
       <header className="sticky top-0 z-30 bg-white/80 backdrop-blur border-b border-amber-100">
@@ -41,6 +45,13 @@ export default function Layout() {
                 </Link>
               );
             })}
+            <button
+              onClick={() => logout()}
+              title="Cerrar sesión"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-medium text-stone-400 hover:bg-stone-100 hover:text-rose-500 transition"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
           </nav>
         </div>
       </header>
@@ -50,6 +61,10 @@ export default function Layout() {
       <footer className="text-center text-xs text-stone-400 py-6">
         Hecho con cariño para las familias · Cápsula de Arte
         <div className="mt-1 text-stone-400">Hecho por <span className="font-semibold text-stone-500">Acacia Consultoría</span></div>
+        <div className="mt-2 flex items-center justify-center gap-3">
+          <Link to="/permisos" className="hover:text-stone-600 transition">Permisos</Link>
+          <Link to="/acerca" className="hover:text-stone-600 transition">Acerca de</Link>
+        </div>
       </footer>
     </div>
   );

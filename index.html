@@ -4,6 +4,24 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>ArtisKids — la cápsula del tiempo de sus dibujos</title>
+    <script>
+      // Pre-mount theme resolution (Module 12) -- applies the stored
+      // preference before React mounts so the first paint is already the
+      // right colour, no flash. Same storage key ("theme") and values
+      // ('light' | 'dark' | 'system') as next-themes' own ThemeProvider in
+      // App.jsx; keep the two in sync if either ever changes.
+      (function () {
+        try {
+          var mode = localStorage.getItem("theme") || "system";
+          var resolved =
+            mode === "system"
+              ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
+              : mode;
+          if (resolved === "dark") document.documentElement.classList.add("dark");
+          document.documentElement.style.colorScheme = resolved;
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

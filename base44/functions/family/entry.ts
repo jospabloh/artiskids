@@ -122,14 +122,16 @@ export default async function (req: Request): Promise<Response> {
   }
   if (!caller?.id) return Response.json({ error: "not authenticated" }, { status: 401 });
 
-  let body: { action?: string; params?: Record<string, unknown> };
+  let body: { action?: string; [key: string]: unknown };
   try {
     body = await req.json();
   } catch {
     return badRequest("invalid JSON body");
   }
-  const { action } = body;
-  const p = body.params ?? {};
+  // Flat body: { action, ...params } -- same convention as content/support,
+  // and the shape shared/session/useSessionManager.js already dictates for
+  // the session function (see the comment there).
+  const { action, ...p } = body;
 
   try {
     switch (action) {
@@ -158,6 +160,22 @@ export default async function (req: Request): Promise<Response> {
         if (slug) await pingNewTenant(slug, family.id);
 
         return Response.json({ ok: true, family });
+      }
+
+      case "listMembers": {
+        // Any member can see who else is in their own family -- needed for
+        // the Account page's member list and role management, and scoped
+        // the same way the RLS tenant-boundary rule would if User.read
+        // weren't locked to "your own row only" by Base44's built-in default.
+        const fresh = await getFreshCaller(base44, caller.id);
+        if (!fresh.family_id) return Response.json({ error: "not in a family" }, { status: 403 });
+        const members = await base44.asServiceRole.entities.User.filter({ family_id: fresh.family_id });
+        const safe = members.map((m: Record<string, unknown>) => ({
+          id: m.id,
+          email: m.email,
+          family_role: m.family_role,
+        }));
+        return Response.json({ members: safe });
       }
 
       case "redeemCode": {
