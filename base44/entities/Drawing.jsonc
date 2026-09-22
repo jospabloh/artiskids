@@ -18,6 +18,10 @@
       "description": "Tenant boundary - the family this drawing belongs to.",
       "type": "string"
     },
+    "file_size_bytes": {
+      "description": "The uploaded image's byte size, set by content/entry.ts's createDrawing from the client's File.size. Feeds Family.storage_used_bytes -- without a real per-drawing size, the family's running total can't be maintained or reversed on delete.",
+      "type": "number"
+    },
     "image_url": {
       "type": "string"
     },

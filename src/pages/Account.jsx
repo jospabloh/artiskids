@@ -6,6 +6,7 @@ import { callFunction } from "@/lib/functions";
 import { notifyMissionControl } from "@/lib/notifyMissionControl";
 import SupportEscapeHatch from "@/components/SupportEscapeHatch";
 import { FAMILY_ROLE_LABELS, isFamilyAdmin } from "@/lib/rbac";
+import { quotaBytesFor, formatBytes } from "@/lib/storageQuota";
 import { Users, Download, Smartphone, ShieldAlert, Loader2, Trash2 } from "lucide-react";
 
 const BILLING_LABELS = {
@@ -188,6 +189,26 @@ export default function Account() {
             {new Date(family.trial_end_at).toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" })}
           </p>
         )}
+        {(() => {
+          const quota = quotaBytesFor(family?.billing_status);
+          if (!quota) return null;
+          const used = Number(family?.storage_used_bytes ?? 0);
+          const pct = Math.min(100, (used / quota) * 100);
+          return (
+            <div className="mt-3">
+              <div className="flex items-center justify-between text-xs text-stone-500 mb-1">
+                <span>Almacenamiento</span>
+                <span>{formatBytes(used)} de {formatBytes(quota)}</span>
+              </div>
+              <div className="h-1.5 rounded-full bg-stone-100 overflow-hidden">
+                <div
+                  className={`h-full rounded-full ${pct >= 90 ? "bg-rose-400" : "bg-amber-400"}`}
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
+            </div>
+          );
+        })()}
         {family?.join_code && (
           <p className="text-xs text-stone-400 mt-3">
             Código de invitación: <span className="font-mono font-semibold text-stone-600">{family.join_code}</span>
