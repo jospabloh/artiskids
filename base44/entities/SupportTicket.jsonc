@@ -1,0 +1,59 @@
+{
+  "name": "SupportTicket",
+  "properties": {
+    "family_id": {
+      "description": "Tenant boundary. Write-locked -- only the support function (service role) sets it, re-derived from the caller's own User.family_id, never trusted from the request body.",
+      "rls": {
+        "write": { "user_condition": { "role": "admin" } }
+      },
+      "type": "string"
+    },
+    "subject": {
+      "type": "string"
+    },
+    "message": {
+      "description": "The ticket's initial body. artiskids doesn't build a two-way reply thread yet (Module 8's letter only requires the app to be the entry point and to sync to Mission Control's tickets bodega) -- Mission Control's own panel is where a human replies.",
+      "type": "string"
+    },
+    "status": {
+      "enum": ["open", "resolved", "closed"],
+      "type": "string"
+    },
+    "created_by_email": {
+      "type": "string"
+    },
+    "last_activity_at": {
+      "description": "Bumped on every status change. Mission Control's auto-close cron reads this to find tickets idle past its grace window.",
+      "format": "date-time",
+      "type": "string"
+    }
+  },
+  "required": ["family_id", "subject", "message", "status", "created_by_email"],
+  "rls": {
+    "create": {
+      "$or": [
+        { "data.family_id": "{{user.data.family_id}}" },
+        { "user_condition": { "role": "admin" } }
+      ]
+    },
+    "delete": {
+      "$or": [
+        { "data.family_id": "{{user.data.family_id}}" },
+        { "user_condition": { "role": "admin" } }
+      ]
+    },
+    "read": {
+      "$or": [
+        { "data.family_id": "{{user.data.family_id}}" },
+        { "user_condition": { "role": "admin" } }
+      ]
+    },
+    "update": {
+      "$or": [
+        { "data.family_id": "{{user.data.family_id}}" },
+        { "user_condition": { "role": "admin" } }
+      ]
+    }
+  },
+  "type": "object"
+}

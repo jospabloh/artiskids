@@ -1,0 +1,51 @@
+{
+  "name": "RolePermission",
+  "properties": {
+    "family_id": {
+      "description": "Tenant boundary. Write-locked -- only the family/content functions (service role) write it, checked by every Safe function alongside the registry default before a write path proceeds (Module 3).",
+      "rls": {
+        "write": { "user_condition": { "role": "admin" } }
+      },
+      "type": "string"
+    },
+    "role": {
+      "enum": ["family_admin", "member"],
+      "type": "string"
+    },
+    "permission_key": {
+      "description": "A key from src/lib/permissionRegistry.js, e.g. \"Dibujos:upload\". One row per (family_id, role, permission_key) override -- absence of a row means the registry's own default applies.",
+      "type": "string"
+    },
+    "allowed": {
+      "type": "boolean"
+    }
+  },
+  "required": ["family_id", "role", "permission_key", "allowed"],
+  "rls": {
+    "create": {
+      "$or": [
+        { "data.family_id": "{{user.data.family_id}}" },
+        { "user_condition": { "role": "admin" } }
+      ]
+    },
+    "delete": {
+      "$or": [
+        { "data.family_id": "{{user.data.family_id}}" },
+        { "user_condition": { "role": "admin" } }
+      ]
+    },
+    "read": {
+      "$or": [
+        { "data.family_id": "{{user.data.family_id}}" },
+        { "user_condition": { "role": "admin" } }
+      ]
+    },
+    "update": {
+      "$or": [
+        { "data.family_id": "{{user.data.family_id}}" },
+        { "user_condition": { "role": "admin" } }
+      ]
+    }
+  },
+  "type": "object"
+}
