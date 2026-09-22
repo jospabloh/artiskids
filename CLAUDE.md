@@ -142,19 +142,40 @@ content/schema, never by hash or by assuming a merge shipped.
    pushed commit, `.env.example`, changelog scaffold. No CLI deploy wrapper
    scripts — see the corrected Deploy discipline decision above. Modules 6
    (scaffold), 11 (adapted), 16 (inventory).
-2. **Family/roles/RLS schema** — `Family` entity, `family_id`/`family_role`
-   on `User`, `family_id` on the six existing tenant entities
-   (`Child`/`Parent`/`Relative`/`Drawing`/`Comment`/`Reaction`), four-op RLS
-   with the explicit service-role admin branch on every op, `validate-rls`
-   script. **`SupportTicket`/`AppSession`/`RolePermission` moved to Phase 3**
-   (corrected 2026-09-21) — nothing consumes them until Phase 3's functions
-   exist, and bundling them into this push would widen its blast radius past
-   what Phase 2 actually needs; one focused schema push beats a bigger one
-   split across two reasons. Modules 1 (field), 2, 4, 18-retired, 19.
-   **Pauses before the entity-schema push goes live** — first confirm
-   whether that path also bypasses GitHub sync the way `base44 deploy` does;
-   either way it can delete remote entities, so it's human-run only,
-   confirmed by content diff after.
+2. **Family/roles/RLS schema — LIVE since 2026-09-22.** `Family` entity,
+   `family_id`/`family_role` on `User`, `family_id` on the six existing
+   tenant entities (`Child`/`Parent`/`Relative`/`Drawing`/`Comment`/
+   `Reaction`), four-op RLS with the explicit service-role admin branch on
+   every op, `validate-rls` script. **`SupportTicket`/`AppSession`/
+   `RolePermission` moved to Phase 3** (corrected 2026-09-21) — nothing
+   consumes them until Phase 3's functions exist, and bundling them into
+   this push would widen its blast radius past what Phase 2 actually needs.
+   Modules 1 (field), 2, 4, 18-retired, 19.
+
+   Pushed via `update_entity_schema`/`create_entity_schema` (Base44 MCP),
+   confirmed live by re-reading `list_entity_schemas` after each call — not
+   assumed from the call succeeding. **Observed platform quirk, worth
+   knowing before Phase 3's own entity pushes**: `update_entity_schema`
+   applied the schema live correctly on every one of the six existing
+   entities, but its write-back of `base44/entities/<Name>.jsonc` into the
+   GitHub-synced repo failed every time, with a warning that "a later sync
+   may revert" the live change. In this case it was harmless — the repo's
+   `main` already carried the exact same content from this same phase's
+   earlier commit, so there's nothing for a future sync to revert *to* that
+   differs. Next time (Phase 3's new entities), verify the repo file still
+   matches the live schema after any such error, and fix it directly if it
+   doesn't — don't assume "applied to the live app" + "write-back failed"
+   nets out safe by default; it only did here because the content already
+   matched going in.
+
+   No data backfill was needed or done: `Family.create` and the write locks
+   are all admin-only, and the sole real account (the owner) has
+   `role: admin`, which unconditionally satisfies every RLS rule's
+   service-role branch regardless of `family_id` — so the app kept working
+   with zero data migration. The 4 seed `Drawing` rows and the owner's own
+   `User.family_id` stay unset until Phase 3's `createFamily` function
+   creates a real family the sanctioned way, rather than being hand-created
+   here through a side door.
 3. **Backend functions, Mission Control bridge, secrets** — `SupportTicket`/
    `AppSession`/`RolePermission` entities (moved here from Phase 2), the
    `acaciaControl` bridge (`_acaciaSign.ts` copied unchanged from
