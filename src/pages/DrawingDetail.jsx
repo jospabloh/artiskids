@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
+import { callFunction } from "@/lib/functions";
 import { Image } from "@/components/ui/image";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
@@ -53,7 +54,7 @@ export default function DrawingDetail() {
   }, {});
 
   const addReaction = async (emoji) => {
-    await base44.entities.Reaction.create({ drawing_id: id, author_name: author || "Familiar", emoji });
+    await callFunction("content", "createReaction", { drawing_id: id, author_name: author || "Familiar", emoji });
     setReactions(await base44.entities.Reaction.filter({ drawing_id: id }, "-created_date", 200));
   };
 
@@ -62,7 +63,7 @@ export default function DrawingDetail() {
     if (!commentText.trim()) return;
     setPosting(true);
     try {
-      await base44.entities.Comment.create({
+      await callFunction("content", "createComment", {
         drawing_id: id,
         author_name: author || "Familiar",
         text: commentText.trim(),
@@ -76,9 +77,7 @@ export default function DrawingDetail() {
 
   const remove = async () => {
     if (!confirm("¿Eliminar este dibujo de la cápsula? Esta acción no se puede deshacer.")) return;
-    await base44.entities.Comment.deleteMany({ drawing_id: id });
-    await base44.entities.Reaction.deleteMany({ drawing_id: id });
-    await base44.entities.Drawing.delete(id);
+    await callFunction("content", "deleteDrawing", { id });
     navigate("/");
   };
 
