@@ -143,6 +143,35 @@ export default async function (req: Request): Promise<Response> {
         return Response.json({ ok: true });
       }
 
+      case "listSessions": {
+        // The Account page's device list -- the caller's own sessions only,
+        // never the rest of the family (a device belongs to a person, not
+        // the tenant, even though AppSession.family_id is the RLS boundary).
+        const fresh = await getFreshCaller(base44, caller.id);
+        if (!fresh.family_id) return Response.json({ sessions: [] });
+        const sessions = await base44.asServiceRole.entities.AppSession.filter(
+          { family_id: fresh.family_id, user_email: fresh.email },
+          "-last_active_at",
+        );
+        return Response.json({ sessions });
+      }
+
+      case "revokeSession": {
+        const sessionId = String(p.session_id ?? "");
+        if (!sessionId) return badRequest("session_id is required");
+        const fresh = await getFreshCaller(base44, caller.id);
+        const session = await base44.asServiceRole.entities.AppSession.get(sessionId);
+        if (!fresh.family_id || session.family_id !== fresh.family_id || session.user_email !== fresh.email) {
+          return Response.json({ error: "not your session" }, { status: 403 });
+        }
+        await base44.asServiceRole.entities.AppSession.update(sessionId, {
+          status: "revoked",
+          revoked_at: new Date().toISOString(),
+          revoked_by: fresh.email,
+        });
+        return Response.json({ ok: true });
+      }
+
       default:
         return badRequest(`unknown action: ${action}`, 404);
     }
