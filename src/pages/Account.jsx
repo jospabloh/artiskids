@@ -159,7 +159,7 @@ export default function Account() {
     <div className="max-w-2xl mx-auto space-y-6">
       <div>
         <h1 className="font-heading font-bold text-2xl text-stone-800 mb-1">Mi cuenta</h1>
-        <p className="text-sm text-stone-500">{user?.email}</p>
+        <p className="text-sm text-stone-500 break-all">{user?.email}</p>
       </div>
 
       {actionFailed ? (
