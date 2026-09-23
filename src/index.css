@@ -4,10 +4,9 @@
 
 @layer base {
   :root {
-    /* Module 12: ThemeSwitcher placement. No bottom nav/FAB in this app to
-       collide with, so the default corner needs no per-width adjustment --
-       re-check this if a bottom tab bar or floating action button is ever
-       added (see shared/theme/README.md). */
+    /* Module 12: ThemeSwitcher placement. Below `sm` Layout.jsx has a fixed
+       bottom tab bar (~56px); at 1rem the switcher sat on its "Cuenta" tab and
+       took its taps. Lifted clear of it at that width only (see below). */
     --theme-switcher-bottom: 1rem;
     --theme-switcher-right: 1rem;
     --background: 0 0% 100%;
@@ -87,6 +86,14 @@
     --sidebar-accent-foreground: 240 4.8% 95.9%;
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  /* 639px = Tailwind's `sm` minus one, the width the bottom tab bar shows at
+     (`sm:hidden` in Layout.jsx). 4.5rem = the bar's ~56px plus a 16px gap. */
+  @media (max-width: 639px) {
+    :root {
+      --theme-switcher-bottom: 4.5rem;
+    }
   }
 }
 
