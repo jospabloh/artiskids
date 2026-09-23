@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { callFunction } from "@/lib/functions";
 import { Image } from "@/components/ui/image";
+import { useDrawingImages } from "@/lib/useDrawingImages";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { ArrowLeft, Send, Heart, Trash2 } from "lucide-react";
@@ -20,6 +21,7 @@ export default function DrawingDetail() {
   const [author, setAuthor] = useState("");
   const [posting, setPosting] = useState(false);
   const [people, setPeople] = useState([]);
+  const imageUrl = useDrawingImages(drawing ? [drawing] : [])[drawing?.id];
 
   useEffect(() => {
     Promise.all([
@@ -103,7 +105,11 @@ export default function DrawingDetail() {
 
       <div className="bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden">
         <div className="bg-stone-50">
-          <Image src={drawing.image_url} alt={drawing.title} fittingType="fit" className="w-full max-h-[70vh] object-contain" />
+          {imageUrl ? (
+            <Image src={imageUrl} alt={drawing.title} fittingType="fit" className="w-full max-h-[70vh] object-contain" />
+          ) : (
+            <div className="w-full aspect-[4/3] animate-pulse bg-stone-100" />
+          )}
         </div>
         <div className="p-5">
           <div className="flex items-start justify-between gap-3">

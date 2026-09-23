@@ -14,6 +14,7 @@ import { defaultAllowed } from "./_permissions.generated.ts";
 const FAMILY_ADMIN = "family_admin";
 const MEMBER = "member";
 const TRIAL_DAYS = 30;
+const EXPORT_LINK_SECONDS = 24 * 60 * 60;
 
 function badRequest(message: string, status = 400): Response {
   return Response.json({ error: message }, { status });
@@ -302,12 +303,14 @@ export default async function (req: Request): Promise<Response> {
         }
         const familyId = fresh.family_id;
 
-        // Files behind Drawing.image_url are NOT removed here -- no
-        // delete-file-by-URL method exists in @base44/sdk's integrations
-        // module as of this writing (checked, not assumed). The rows are
-        // gone; the storage objects are an orphan-cleanup gap, flagged for
-        // Module 14's audit rather than papered over with a call that would
-        // silently no-op or throw.
+        // The image files are NOT removed here: @base44/sdk 0.8.49's Core
+        // integrations have no delete-file method at all (re-checked
+        // 2026-09-23). For a private upload that is a storage cost, not a
+        // leak -- a file_uri only becomes viewable through content's
+        // imageUrls, which signs only for a Drawing row that still exists and
+        // belongs to the caller's family, and that row is deleted just below.
+        // A LEGACY public upload (image_url) stays reachable at its old link;
+        // deleting the row cannot take that back.
         await base44.asServiceRole.entities.Drawing.deleteMany({ family_id: familyId });
         await base44.asServiceRole.entities.Comment.deleteMany({ family_id: familyId });
         await base44.asServiceRole.entities.Reaction.deleteMany({ family_id: familyId });
@@ -346,13 +349,26 @@ export default async function (req: Request): Promise<Response> {
           base44.entities.Reaction.filter({ family_id: fresh.family_id }),
         ]);
 
+        // A private file_uri means nothing outside the app, so each drawing
+        // carries a download link instead. Signed for a day: long enough to
+        // fetch the export, short enough that a forwarded file goes stale.
+        const exportedDrawings = await Promise.all(drawings.map(async (d: Record<string, unknown>) => {
+          if (!d.image_file_uri) return d;
+          const { signed_url } = await base44.asServiceRole.integrations.Core.CreateFileSignedUrl({
+            file_uri: d.image_file_uri as string,
+            expires_in: EXPORT_LINK_SECONDS,
+          });
+          return { ...d, image_download_url: signed_url };
+        }));
+
         return Response.json({
           exported_at: new Date().toISOString(),
+          image_links_expire_in_seconds: EXPORT_LINK_SECONDS,
           family: { name: family.name, billing_status: family.billing_status },
           children,
           parents,
           relatives,
-          drawings,
+          drawings: exportedDrawings,
           comments,
           reactions,
         });

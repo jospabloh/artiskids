@@ -12,6 +12,7 @@ import { defaultAllowed } from "./_permissions.generated.ts";
 import { quotaBytesFor } from "./_storageQuota.ts";
 
 const CATALOG_ENTITIES = new Set(["Child", "Parent", "Relative"]);
+const IMAGE_LINK_SECONDS = 3600;
 
 function badRequest(message: string, status = 400): Response {
   return Response.json({ error: message }, { status });
@@ -86,10 +87,13 @@ export default async function (req: Request): Promise<Response> {
         }
         const title = String(p.title ?? "").trim();
         const creatorName = String(p.creator_name ?? "").trim();
-        const imageUrl = String(p.image_url ?? "").trim();
+        // Private storage only. A public image_url is refused outright rather
+        // than accepted as a fallback: a public file is readable by anyone who
+        // has its link, with no login, and these are children's drawings.
+        const imageFileUri = String(p.image_file_uri ?? "").trim();
         const fileSizeBytes = Number(p.file_size_bytes ?? 0);
-        if (!title || !creatorName || !imageUrl) {
-          return badRequest("title, creator_name and image_url are required");
+        if (!title || !creatorName || !imageFileUri) {
+          return badRequest("title, creator_name and image_file_uri are required");
         }
         if (!Number.isFinite(fileSizeBytes) || fileSizeBytes <= 0) {
           return badRequest("file_size_bytes is required");
@@ -106,7 +110,7 @@ export default async function (req: Request): Promise<Response> {
           family_id: familyId,
           title,
           creator_name: creatorName,
-          image_url: imageUrl,
+          image_file_uri: imageFileUri,
           file_size_bytes: fileSizeBytes,
           description: p.description ? String(p.description) : undefined,
           drawn_date: p.drawn_date ? String(p.drawn_date) : undefined,
@@ -116,6 +120,31 @@ export default async function (req: Request): Promise<Response> {
           storage_used_bytes: used + fileSizeBytes,
         });
         return Response.json({ ok: true, drawing });
+      }
+
+      case "imageUrls": {
+        // Short-lived signed links for private drawings, minted here rather
+        // than in the browser so the family check below always runs: a
+        // file_uri alone must never be enough to see a photo. Reading is not
+        // gated on billing_status -- view_only families can still look.
+        const ids = Array.isArray(p.ids) ? [...new Set((p.ids as unknown[]).map(String))].slice(0, 200) : [];
+        const urls: Record<string, string> = {};
+        await Promise.all(ids.map(async (id) => {
+          const d = await base44.asServiceRole.entities.Drawing.get(id).catch(() => null);
+          // Checked against the STORED row, never the request: another
+          // family's id simply gets no link, same as an id that doesn't exist.
+          if (!d || d.family_id !== familyId) return;
+          if (d.image_file_uri) {
+            const { signed_url } = await base44.asServiceRole.integrations.Core.CreateFileSignedUrl({
+              file_uri: d.image_file_uri,
+              expires_in: IMAGE_LINK_SECONDS,
+            });
+            urls[id] = signed_url;
+          } else if (d.image_url) {
+            urls[id] = d.image_url; // legacy public upload, see Drawing.jsonc
+          }
+        }));
+        return Response.json({ urls, expires_in: IMAGE_LINK_SECONDS });
       }
 
       case "deleteDrawing": {

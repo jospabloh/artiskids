@@ -17,7 +17,7 @@ export default function Upload() {
   const [form, setForm] = useState({ title: "", description: "", drawn_date: "", creator_name: "", album: "Otros" });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
-  // UploadPublicFile (not a callFunction call) and createDrawing's own
+  // UploadPrivateFile (not a callFunction call) and createDrawing's own
   // non-router failures both land here -- neither is something the form's
   // own fields can fix, so this replaces the form with the escape hatch
   // instead of showing raw text under a "try again" that won't help.
@@ -49,11 +49,14 @@ export default function Upload() {
     setError(null);
     setFatalError(false);
     try {
-      const { file_url } = await base44.integrations.Core.UploadPublicFile({ file });
+      // Private storage: the file has no public link. It is only ever shown
+      // through a short-lived signed URL the content function mints after
+      // checking the drawing belongs to the viewer's family.
+      const { file_uri } = await base44.integrations.Core.UploadPrivateFile({ file });
       await callFunction("content", "createDrawing", {
         ...form,
         drawn_date: form.drawn_date || new Date().toISOString().slice(0, 10),
-        image_url: file_url,
+        image_file_uri: file_uri,
         file_size_bytes: file.size,
       });
       navigate("/");
