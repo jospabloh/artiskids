@@ -110,10 +110,10 @@ why they are frozen here before schema work starts.
   still requires login), but it means anyone with a leaked URL sees the image
   without authenticating. Revisit private files + signed URLs when Module 14
   audits attachment URLs.
-- Which OAuth providers are actually enabled on this Base44 app (Google?) is
-  unverified from this session — check the Base44 auth panel before Phase 4
-  ships the real login page, so it never shows a button for a provider that
-  isn't configured (Module 10).
+- **Closed 2026-09-23**: Google OAuth is live and in active use — the
+  platform owner confirmed logging in with it directly, not inferred from
+  the button being present. The Login/Register pages' Google button is a
+  real, configured provider, not a dead-end click.
 - **Closed 2026-09-22**: the real logo (origami-crane mark, 1024×1024, from
   `resources/artiskids_logo.png` on `main` — dropped in via the GitHub web UI,
   not part of the compliance rollout's own commits) now lives at
@@ -291,12 +291,16 @@ content/schema, never by hash or by assuming a merge shipped.
    exist covers it; status changes work, replies from the panel don't yet.
    Two new tests in that repo cover both paths.
 
-   **Pauses before the migration runs against production Supabase** — it's
-   read by every cron from that point on. Both PRs are additionally
-   downstream of Phase 3's own pause: the registry row can exist before
-   artiskids' backend is deployed (the sync cron just gets "not reachable"
-   until then, same as any newly-registered app before its first
-   successful sync), but nothing here makes the bridge itself live.
+   **Migration run against production 2026-09-23.** `0045_seed_artiskids.sql`
+   was applied directly to Mission Control's live Supabase project
+   (`xrvjnadirzsjvzknfyjf`) via `apply_migration` and confirmed by reading
+   the row back (`select … from apps where id = 'artiskids'`) — not assumed
+   from the tool's success flag. Before this, `select id from apps` on
+   production returned 33 rows with no `artiskids` among them, confirming
+   the pause documented below had genuinely held since the PRs merged
+   2026-09-22; it's 34 now. Not yet done: pressing *Sincronizar ahora* and
+   confirming an `app_health` row (Phase 6's own proof step) — the row
+   existing is necessary but isn't that proof.
 6. **Deploy, prove, audit, cut over** — human-run deploys, *Sincronizar
    ahora* → `app_health` + `control:run-sync` proof, smoke suite wired to
    `.github/workflows/smoke.yml`, session-reap gate exercised, the dated
