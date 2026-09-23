@@ -155,6 +155,7 @@ export default async function (req: Request): Promise<Response> {
         await base44.asServiceRole.entities.User.update(caller.id, {
           family_id: family.id,
           family_role: FAMILY_ADMIN,
+          pending_family_id: null,
         });
 
         const slug = secrets.get("ACACIA_APP_SLUG");
@@ -190,11 +191,77 @@ export default async function (req: Request): Promise<Response> {
         const family = matches[0];
         if (!family) return Response.json({ error: "invalid join code" }, { status: 404 });
 
+        // A code REQUESTS access; the family's admin grants it (Module 2).
+        // Joining straight away meant anyone holding a forwarded code saw
+        // every drawing in the family. A new code replaces an older request.
         await base44.asServiceRole.entities.User.update(caller.id, {
-          family_id: family.id,
-          family_role: MEMBER,
+          pending_family_id: family.id,
         });
-        return Response.json({ ok: true, family });
+        return Response.json({ ok: true, pending: true, family_name: family.name });
+      }
+
+      case "joinRequestStatus": {
+        const fresh = await getFreshCaller(base44, caller.id);
+        if (fresh.family_id || !fresh.pending_family_id) return Response.json({ pending: null });
+        const family = await base44.asServiceRole.entities.Family.get(fresh.pending_family_id).catch(() => null);
+        if (!family) {
+          // The family was deleted while the request waited.
+          await base44.asServiceRole.entities.User.update(caller.id, { pending_family_id: null });
+          return Response.json({ pending: null });
+        }
+        return Response.json({ pending: { family_name: family.name } });
+      }
+
+      case "cancelJoinRequest": {
+        await base44.asServiceRole.entities.User.update(caller.id, { pending_family_id: null });
+        return Response.json({ ok: true });
+      }
+
+      case "listJoinRequests": {
+        const fresh = await getFreshCaller(base44, caller.id);
+        if (!fresh.family_id) return Response.json({ error: "not in a family" }, { status: 403 });
+        if (!(await canManageFamily(base44, fresh, "manage_members"))) {
+          return Response.json({ error: "not allowed to manage members" }, { status: 403 });
+        }
+        const requesters = await base44.asServiceRole.entities.User.filter({ pending_family_id: fresh.family_id });
+        const requests = requesters
+          .filter((u: Record<string, unknown>) => !u.family_id)
+          .map((u: Record<string, unknown>) => ({ id: u.id, email: u.email }));
+        return Response.json({ requests });
+      }
+
+      case "approveJoinRequest":
+      case "rejectJoinRequest": {
+        const targetUserId = String(p.target_user_id ?? "");
+        if (!targetUserId) return badRequest("target_user_id is required");
+
+        const fresh = await getFreshCaller(base44, caller.id);
+        if (!fresh.family_id) return Response.json({ error: "not in a family" }, { status: 403 });
+        if (!(await canManageFamily(base44, fresh, "manage_members"))) {
+          return Response.json({ error: "not allowed to manage members" }, { status: 403 });
+        }
+        // Checked against the requester's STORED row, never the request body:
+        // an admin can only answer requests made to their own family.
+        const target = await base44.asServiceRole.entities.User.get(targetUserId).catch(() => null);
+        if (!target || target.pending_family_id !== fresh.family_id) {
+          return Response.json({ error: "no pending request for your family" }, { status: 404 });
+        }
+
+        if (action === "rejectJoinRequest") {
+          await base44.asServiceRole.entities.User.update(targetUserId, { pending_family_id: null });
+          return Response.json({ ok: true });
+        }
+        if (target.family_id) {
+          // Joined or created another family in the meantime.
+          await base44.asServiceRole.entities.User.update(targetUserId, { pending_family_id: null });
+          return Response.json({ error: "already in a family" }, { status: 409 });
+        }
+        await base44.asServiceRole.entities.User.update(targetUserId, {
+          family_id: fresh.family_id,
+          family_role: MEMBER,
+          pending_family_id: null,
+        });
+        return Response.json({ ok: true });
       }
 
       case "setMemberRole":
@@ -325,6 +392,11 @@ export default async function (req: Request): Promise<Response> {
             family_id: null,
             family_role: null,
           });
+        }
+
+        const requesters = await base44.asServiceRole.entities.User.filter({ pending_family_id: familyId });
+        for (const requester of requesters) {
+          await base44.asServiceRole.entities.User.update(requester.id, { pending_family_id: null });
         }
 
         await base44.asServiceRole.entities.Family.delete(familyId);

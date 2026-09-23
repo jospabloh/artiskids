@@ -733,11 +733,16 @@ caller's own name/email. No email is sent to a family from this app.
 **Tenant switching.** None exists: `createFamily`/`redeemCode` answer 409 to a
 caller who already has a `family_id` (Module 18-retired).
 
-**OPEN — joining needs the admin's approval (Module 2).** `redeemCode` makes
-the caller a `member` immediately. The standard (STANDARD.md §2) says a code
-"does not grant access by itself" — it must create a pending request the
-family's admin approves. Today anyone holding the code, e.g. from a forwarded
-WhatsApp message, sees every drawing in that family. Not yet fixed.
+**Closed in code 2026-09-23 (PR #17) — joining needs the admin's approval
+(Module 2).** `redeemCode` used to make the caller a `member` on the spot, so
+anyone holding a forwarded code saw every drawing. Now it only sets
+`User.pending_family_id` (write-locked like `family_id`, and compared by no RLS
+rule, so it grants nothing). The family's admin sees the request in Mi cuenta;
+`approveJoinRequest`/`rejectJoinRequest` check the requester's **stored**
+`pending_family_id` against the admin's own family. `joinRequestStatus` and
+`cancelJoinRequest` drive the requester's waiting screen; `createFamily` and
+`deleteFamily` clear stale requests. Deploy order: schema synced first, or
+`redeemCode` writes a field the live `User` schema doesn't have yet.
 
 **Could not verify from here:**
 - A signed-in session as a second family's member, to watch RLS refuse
@@ -756,8 +761,8 @@ WhatsApp message, sees every drawing in that family. Not yet fixed.
 - [x] 1 License lifecycle — `billing_status` write-locked; 30-day trial set
       server-side; Mission Control's unified cron now covers the app
       (registered, synced). New-tenant ping fires; MC has no receiver yet.
-- [~] 2 Roles — two roles, one gated code path, zero-admin guard. **Gap:
-      `redeemCode` joins without the admin's approval** (see Module 14).
+- [x] 2 Roles — two roles, one gated code path, zero-admin guard; invite
+      code is request-then-approve (PR #17, not yet deployed).
 - [~] 3 Permissions — one registry, server re-check on every write, billing
       gate. **Gap: Permisos is a read-only view**, not the editable matrix.
 - [~] 4 RLS — four-op `$or` everywhere, deployed = repo. `validate:rls`
