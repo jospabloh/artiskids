@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { base44 } from "@/api/base44Client";
 import DrawingCard from "@/components/DrawingCard";
+import { useDrawingImages } from "@/lib/useDrawingImages";
 import { Image } from "@/components/ui/image";
 import { Link } from "react-router-dom";
 import { format, parseISO, isSameDay } from "date-fns";
@@ -11,6 +12,7 @@ export default function Home() {
   const [drawings, setDrawings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [albumFilter, setAlbumFilter] = useState("Todos");
+  const imageUrls = useDrawingImages(drawings);
 
   useEffect(() => {
     base44.entities.Drawing.list("-drawn_date", 200)
@@ -53,7 +55,11 @@ export default function Home() {
             {todayMemories.map((d) => (
               <Link key={d.id} to={`/dibujo/${d.id}`} className="block rounded-xl overflow-hidden bg-white border border-stone-100 shadow-sm hover:shadow-md transition">
                 <div className="aspect-square bg-stone-50">
-                  <Image src={d.image_url} alt={d.title} fittingType="fit" className="w-full h-full object-contain" />
+                  {imageUrls[d.id] ? (
+                    <Image src={imageUrls[d.id]} alt={d.title} fittingType="fit" className="w-full h-full object-contain" />
+                  ) : (
+                    <div className="w-full h-full animate-pulse bg-stone-100" />
+                  )}
                 </div>
                 <div className="p-2">
                   <div className="text-xs font-semibold text-stone-700 truncate">{d.title}</div>
@@ -122,7 +128,7 @@ export default function Home() {
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             {filtered.map((d) => (
-              <DrawingCard key={d.id} drawing={d} />
+              <DrawingCard key={d.id} drawing={d} imageUrl={imageUrls[d.id]} />
             ))}
           </div>
         )}

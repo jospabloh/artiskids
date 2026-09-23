@@ -64,10 +64,13 @@ export default function Layout() {
           </button>
         </div>
       </header>
-      <main className="flex-1 max-w-5xl w-full mx-auto px-4 py-6 pb-24 sm:pb-6">
+      <main className="flex-1 max-w-5xl w-full mx-auto px-4 py-6">
         <Outlet />
       </main>
-      <footer className="text-center text-xs text-stone-400 py-6">
+      {/* The tab-bar clearance lives here, not on <main>: the footer is the
+          last thing in the flow, so padding on <main> left its links under
+          the fixed bar on phones. */}
+      <footer className="text-center text-xs text-stone-400 pt-6 pb-24 sm:pb-6">
         Hecho con cariño para las familias · Cápsula de Arte
         <div className="mt-1 text-stone-400">Hecho por <span className="font-semibold text-stone-500">Acacia Consultoría</span></div>
         <div className="mt-2 flex items-center justify-center gap-3">

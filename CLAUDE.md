@@ -10,10 +10,11 @@ retired).
 
 A family "art capsule": children's drawings get uploaded, and family members
 comment/react to them. Base44 app, id `6aaeda94a9028c3f2e96b9e5` (branch
-`main`). Not yet live at a domain; will be `artiskids.acaciaco.com.mx`, with
-its marketing/plans page at `https://www.acaciaco.com.mx/apps/artiskids`
-(`jospabloh/acaciaco-site` → `apps/`), and a row in
-`jospabloh/acacia-mission-control`'s app registry.
+`main`). Live at `https://artiskids.acaciaco.com.mx` (confirmed 2026-09-23: 200
+with this app's own `<title>`), marketing/plans page at
+`https://www.acaciaco.com.mx/apps/artiskids` (`jospabloh/acaciaco-site` →
+`apps/`), and registered in `jospabloh/acacia-mission-control` as `artiskids`
+(0045 seed + 0046 URL, both applied to production).
 
 ## Frozen decisions — 2026-09-20 (Phase 0 of the compliance rollout)
 
@@ -105,11 +106,11 @@ why they are frozen here before schema work starts.
 
 ## Known gaps to carry into the Module 14 audit (not blocking, but don't forget)
 
-- `Drawing.image_url` is written via `UploadPublicFile` — a world-readable
-  URL for children's artwork. Acceptable to ship v1 with (the app itself
-  still requires login), but it means anyone with a leaked URL sees the image
-  without authenticating. Revisit private files + signed URLs when Module 14
-  audits attachment URLs.
+- **Closed in code 2026-09-23 (PR #17)**: drawings were uploaded with
+  `UploadPublicFile`, so every photo was a URL anyone could open with no
+  login — confirmed against production (the one real drawing downloaded
+  anonymously, 3.1 MB). Now private storage + server-minted signed links; see
+  "Private photos" below. One legacy public upload remains until re-uploaded.
 - **Closed 2026-09-23**: Google OAuth is live and in active use — the
   platform owner confirmed logging in with it directly, not inferred from
   the button being present. The Login/Register pages' Google button is a
@@ -251,11 +252,8 @@ content/schema, never by hash or by assuming a merge shipped.
    URL via `useLocation()`, which survives a reload for free. Nothing extra
    to build here unless the nav ever grows a collapsible section.
 
-   **Still unverified, carried from Phase 0's "known gaps"**: which OAuth
-   providers are actually enabled on the live Base44 app (Google shows a
-   button in `Login.jsx`/`Register.jsx` regardless -- check the Base44 auth
-   panel before Phase 6's cutover, or a configured-off provider 404s on
-   click). Also genuinely unverified from this sandbox: the whole flow in a
+   (OAuth: resolved 2026-09-23, Google is live and in use — see Known
+   gaps.) Genuinely unverified from this sandbox: the whole flow in a
    real browser (create/join family, upload, theme toggle, the 20-minute
    idle warning, an admin's danger-zone actions) -- this environment's proxy
    can't reach a live Base44 preview, so that's Phase 6's `npm run
@@ -298,16 +296,22 @@ content/schema, never by hash or by assuming a merge shipped.
    from the tool's success flag. Before this, `select id from apps` on
    production returned 33 rows with no `artiskids` among them, confirming
    the pause documented below had genuinely held since the PRs merged
-   2026-09-22; it's 34 now. Not yet done: pressing *Sincronizar ahora* and
-   confirming an `app_health` row (Phase 6's own proof step) — the row
-   existing is necessary but isn't that proof.
-6. **Deploy, prove, audit, cut over** — human-run deploys, *Sincronizar
-   ahora* → `app_health` + `control:run-sync` proof, smoke suite wired to
-   `.github/workflows/smoke.yml`, session-reap gate exercised, the dated
-   Module 14 isolation audit (against the deployed schema, with an explicit
-   "could not verify" list), then DNS + the Mission Control URL migration.
-   Modules 13, 14, 5 (proof), 16 (proof), 17 (proof), 1 (proof). **Pauses at
-   domain cutover.**
+   2026-09-22; it's 34 now. The data-path proof is in Phase 6 below.
+6. **Deploy, prove, audit, cut over — proven 2026-09-23 except where noted.**
+   - **Data path (Modules 5, 17 proof):** *Sincronizar ahora* first FAILED
+     (`502 bad signature`, Vercel log 03:29 UTC) — see "The bridge's first
+     sync" below. After the fix: `POST /api/control/run-sync 200`, a
+     `control:run-sync` audit row, 1 family / 1 license / 4 usage metrics / 5
+     sessions synced. The daily cron then wrote `app_health` `status: ok`,
+     383 ms (08:29 UTC). Note: *Sincronizar ahora* on the app page never
+     writes `app_health` — its kinds are licenses/usage/sessions; health only
+     comes from the Salud page's probe or the daily cron.
+   - **Cutover:** domain live; `0046_artiskids_url.sql` applied to production
+     and read back (mission-control PR #109, merged).
+   - **Smoke suite (Module 13):** added in PR #17; first real run is the
+     GitHub Actions `workflow_dispatch` after merge.
+   - **Module 14 audit:** written below, dated.
+   - **Session-reap gate (Module 20):** see Module 14's "could not verify".
 
 ## RLS design notes (Phase 2, 2026-09-21)
 
@@ -649,3 +653,139 @@ Still not exercised: uploading a drawing through the Safe path, Account's
 member/session lists and danger-zone actions, and a Soporte ticket
 submission. Those are the next real-world checks — the "function not
 found" class that blocked Phase 3 is closed either way.
+
+## The bridge's first sync: `bad signature`, and it was the slug (2026-09-23)
+
+The first *Sincronizar ahora* after the registry row went in failed:
+
+```
+03:29:25 POST /api/control/run-sync 502
+callBridge failed: app=artiskids (ArtisKids) action=licenses.list error=bad signature
+```
+
+With `ACCEPT_LEGACY_MASTER = false` on both sides there is no fallback, so
+`bad signature` means the derived key differs: either `ACACIA_APP_SLUG` is not
+exactly `artiskids`, or `INGEST_HMAC_SECRET` differs between Vercel and this
+app. Neither value can be read back (Base44's secrets API is set-only). The
+slug was set to `artiskids` via `POST /api/apps/{id}/secrets` — the response
+said `updated`, so it already existed with some other value — and the next
+sync returned 200. **It was the slug**, the same fault radar/rumbo/puntos/liuma
+had in August: Phase 3's "confirmed present and matching via `base44 secrets
+list`" checked the secret's *name*, never its *value*. Presence is not
+correctness; only a call that fails when the value is wrong proves it.
+
+## Private photos (2026-09-23, PR #17)
+
+Uploads used `UploadPublicFile`: the family's one real drawing downloaded with
+no login at its stored URL (HTTP 200, 3.1 MB). Now:
+
+- `Upload.jsx` → `UploadPrivateFile` → `Drawing.image_file_uri` (not a URL).
+- `content` action `imageUrls` mints one-hour signed links **server-side**,
+  per requested id, only after `Drawing.get(id)` shows the stored `family_id`
+  equals the caller's. Another family's id gets nothing, same as a missing one.
+  Signing in the browser would make a leaked `file_uri` enough to see a photo.
+- `createDrawing` refuses `image_url`; `exportData` adds day-long
+  `image_download_url`s.
+- Legacy `image_url` rows still display, and **their public link cannot be
+  revoked** — `@base44/sdk` 0.8.49 has no delete-file method. Re-upload them.
+
+**Deploy order matters**: schema synced → `base44 functions deploy content`,
+`family` → publish frontend. Frontend-first breaks uploads until the functions
+land (the old `createDrawing` still requires `image_url`).
+
+## Module 14 — multi-tenant isolation audit (2026-09-23)
+
+Against the **deployed** app, not the repo. Tenant = `Family`; boundary field
+`family_id`.
+
+**Schema.** `list_entity_schemas` on the live app returned all 11 entities
+byte-identical to `base44/entities/*.jsonc`. Every tenant-scoped entity
+(`Drawing`, `Comment`, `Reaction`, `Child`, `Parent`, `Relative`,
+`SupportTicket`, `AppSession`, `RolePermission`) has the four-op `$or`:
+`data.family_id == {{user.data.family_id}}` or `user_condition.role == admin`.
+`Family` reads/updates on `id == {{user.data.family_id}}`; create/delete admin
+only. Write-locked to the service tier: `User.family_id`/`family_role`, all of
+`Family`'s billing fields and `storage_used_bytes`, and `family_id` on
+`SupportTicket`/`AppSession`/`RolePermission`.
+
+**Functions** (read line by line). Every action in `family`, `content`,
+`session`, `support` starts from `getFreshCaller` — a service-role re-read of
+the caller's own `User`, never the JWT or the body (Module 22). Anything that
+touches an existing record checks that record's **stored** `family_id`
+(`deleteDrawing`, `createComment`/`createReaction` via the target drawing,
+`deleteCatalogEntry`, `setMemberRole`/`delegateAdmin`/`removeMember` via the
+target user, `sessionHeartbeat`/`revokeSession` via the session plus the
+caller's email). `createCatalogEntry` spreads client `data` but writes
+`family_id` last, so a smuggled `family_id` is overwritten. `exportData` reads
+through the caller-scoped client, so RLS itself bounds it.
+
+**Bridge.** `acaciaControl` fails closed (503) without its secrets, verifies
+the per-app derived HMAC, and whitelists entity names per action. It reads
+across families **by design** — Mission Control operates every tenant of this
+app; the boundary it guards is *between apps*, which the derived key enforces.
+
+**Files.** Private since PR #17; see above. One legacy public file remains.
+
+**Outbound.** Tickets pushed to Mission Control carry the ticket's own
+`family_id`, re-derived server-side. `notifyMissionControl` sends only the
+caller's own name/email. No email is sent to a family from this app.
+
+**Tenant switching.** None exists: `createFamily`/`redeemCode` answer 409 to a
+caller who already has a `family_id` (Module 18-retired).
+
+**Closed in code 2026-09-23 (PR #17) — joining needs the admin's approval
+(Module 2).** `redeemCode` used to make the caller a `member` on the spot, so
+anyone holding a forwarded code saw every drawing. Now it only sets
+`User.pending_family_id` (write-locked like `family_id`, and compared by no RLS
+rule, so it grants nothing). The family's admin sees the request in Mi cuenta;
+`approveJoinRequest`/`rejectJoinRequest` check the requester's **stored**
+`pending_family_id` against the admin's own family. `joinRequestStatus` and
+`cancelJoinRequest` drive the requester's waiting screen; `createFamily` and
+`deleteFamily` clear stale requests. Deploy order: schema synced first, or
+`redeemCode` writes a field the live `User` schema doesn't have yet.
+
+**Could not verify from here:**
+- A signed-in session as a second family's member, to watch RLS refuse
+  cross-family reads end to end. There is one family in production.
+- The hourly reap job (`purgeStaleSessions`) actually passing its guard — see
+  "Session reap probe" below.
+- `removeMember`/`deleteFamily` clearing `User.family_id` to `null`: likely
+  fine (Base44 itself stores unset optional strings as `null`, observed on
+  `AppSession`), but never executed against a real `User`.
+
+## ACACIA Portfolio Standard — status (audited 2026-09-23)
+
+`[x]` done and proven where proof is possible · `[~]` done with a named gap ·
+`[ ]` open. Full text of each module: `acacia-app-standard/CHECKLIST.md`.
+
+- [x] 1 License lifecycle — `billing_status` write-locked; 30-day trial set
+      server-side; Mission Control's unified cron now covers the app
+      (registered, synced). New-tenant ping fires; MC has no receiver yet.
+- [x] 2 Roles — two roles, one gated code path, zero-admin guard; invite
+      code is request-then-approve (PR #17, not yet deployed).
+- [~] 3 Permissions — one registry, server re-check on every write, billing
+      gate. **Gap: Permisos is a read-only view**, not the editable matrix.
+- [~] 4 RLS — four-op `$or` everywhere, deployed = repo. `validate:rls`
+      exists but no CI workflow runs it.
+- [x] 5 Health — `acaciaControl` ping; `app_health` `ok` 383 ms (2026-09-23).
+- [x] 6 Changelog — `APP_VERSION`/changelog via `scripts/release.mjs`.
+- [~] 7 Account & danger zone — both delete scopes, delegate, export.
+      Confirmation is the browser's `confirm()`, not a typed confirmation.
+- [x] 8 Support — `SupportTicket` + real-time push to Mission Control.
+- [x] 9 acaciaco-site page — `apps/artiskids.html`.
+- [x] 10 Login — split-screen, Spanish, Google live, no hosted-login redirect.
+- [x] 11 Deploy discipline — adapted to GitHub sync (see Frozen decisions).
+- [x] 12 Theme — shared switcher; mobile tab-bar collision fixed (PR #17).
+- [~] 13 Smoke test — suite + workflow added (PR #17); first CI run pending.
+- [x] 14 Isolation audit — above, 2026-09-23, with its could-not-verify list.
+- [x] 15 Bridge — derived key, `ACCEPT_LEGACY_MASTER = false`, proven by sync.
+- [~] 16 Secrets — `ACACIA_APP_SLUG` and `INGEST_HMAC_SECRET` proven by a
+      successful sync; `CRON_SECRET` see Module 20; `PLATFORM_OWNER_EMAIL` unproven.
+- [x] 17 Mission Control side — row, adapter, config entries, sync proven.
+- [x] 18 Retired — one account, one family; 409 on a second.
+- [x] 19 Locks state their rationale in their own field descriptions.
+- [~] 20 Session control — idle warning, device list, revoke. Reap job: see
+      "Session reap probe".
+- [x] 21 About screen.
+- [x] 22 Server-authoritative diffing — `getFreshCaller` in every router.
+- [x] 23 Nav survives reload — route-derived, no collapsible state.

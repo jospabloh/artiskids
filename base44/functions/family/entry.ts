@@ -14,6 +14,7 @@ import { defaultAllowed } from "./_permissions.generated.ts";
 const FAMILY_ADMIN = "family_admin";
 const MEMBER = "member";
 const TRIAL_DAYS = 30;
+const EXPORT_LINK_SECONDS = 24 * 60 * 60;
 
 function badRequest(message: string, status = 400): Response {
   return Response.json({ error: message }, { status });
@@ -154,6 +155,7 @@ export default async function (req: Request): Promise<Response> {
         await base44.asServiceRole.entities.User.update(caller.id, {
           family_id: family.id,
           family_role: FAMILY_ADMIN,
+          pending_family_id: null,
         });
 
         const slug = secrets.get("ACACIA_APP_SLUG");
@@ -189,11 +191,77 @@ export default async function (req: Request): Promise<Response> {
         const family = matches[0];
         if (!family) return Response.json({ error: "invalid join code" }, { status: 404 });
 
+        // A code REQUESTS access; the family's admin grants it (Module 2).
+        // Joining straight away meant anyone holding a forwarded code saw
+        // every drawing in the family. A new code replaces an older request.
         await base44.asServiceRole.entities.User.update(caller.id, {
-          family_id: family.id,
-          family_role: MEMBER,
+          pending_family_id: family.id,
         });
-        return Response.json({ ok: true, family });
+        return Response.json({ ok: true, pending: true, family_name: family.name });
+      }
+
+      case "joinRequestStatus": {
+        const fresh = await getFreshCaller(base44, caller.id);
+        if (fresh.family_id || !fresh.pending_family_id) return Response.json({ pending: null });
+        const family = await base44.asServiceRole.entities.Family.get(fresh.pending_family_id).catch(() => null);
+        if (!family) {
+          // The family was deleted while the request waited.
+          await base44.asServiceRole.entities.User.update(caller.id, { pending_family_id: null });
+          return Response.json({ pending: null });
+        }
+        return Response.json({ pending: { family_name: family.name } });
+      }
+
+      case "cancelJoinRequest": {
+        await base44.asServiceRole.entities.User.update(caller.id, { pending_family_id: null });
+        return Response.json({ ok: true });
+      }
+
+      case "listJoinRequests": {
+        const fresh = await getFreshCaller(base44, caller.id);
+        if (!fresh.family_id) return Response.json({ error: "not in a family" }, { status: 403 });
+        if (!(await canManageFamily(base44, fresh, "manage_members"))) {
+          return Response.json({ error: "not allowed to manage members" }, { status: 403 });
+        }
+        const requesters = await base44.asServiceRole.entities.User.filter({ pending_family_id: fresh.family_id });
+        const requests = requesters
+          .filter((u: Record<string, unknown>) => !u.family_id)
+          .map((u: Record<string, unknown>) => ({ id: u.id, email: u.email }));
+        return Response.json({ requests });
+      }
+
+      case "approveJoinRequest":
+      case "rejectJoinRequest": {
+        const targetUserId = String(p.target_user_id ?? "");
+        if (!targetUserId) return badRequest("target_user_id is required");
+
+        const fresh = await getFreshCaller(base44, caller.id);
+        if (!fresh.family_id) return Response.json({ error: "not in a family" }, { status: 403 });
+        if (!(await canManageFamily(base44, fresh, "manage_members"))) {
+          return Response.json({ error: "not allowed to manage members" }, { status: 403 });
+        }
+        // Checked against the requester's STORED row, never the request body:
+        // an admin can only answer requests made to their own family.
+        const target = await base44.asServiceRole.entities.User.get(targetUserId).catch(() => null);
+        if (!target || target.pending_family_id !== fresh.family_id) {
+          return Response.json({ error: "no pending request for your family" }, { status: 404 });
+        }
+
+        if (action === "rejectJoinRequest") {
+          await base44.asServiceRole.entities.User.update(targetUserId, { pending_family_id: null });
+          return Response.json({ ok: true });
+        }
+        if (target.family_id) {
+          // Joined or created another family in the meantime.
+          await base44.asServiceRole.entities.User.update(targetUserId, { pending_family_id: null });
+          return Response.json({ error: "already in a family" }, { status: 409 });
+        }
+        await base44.asServiceRole.entities.User.update(targetUserId, {
+          family_id: fresh.family_id,
+          family_role: MEMBER,
+          pending_family_id: null,
+        });
+        return Response.json({ ok: true });
       }
 
       case "setMemberRole":
@@ -302,12 +370,14 @@ export default async function (req: Request): Promise<Response> {
         }
         const familyId = fresh.family_id;
 
-        // Files behind Drawing.image_url are NOT removed here -- no
-        // delete-file-by-URL method exists in @base44/sdk's integrations
-        // module as of this writing (checked, not assumed). The rows are
-        // gone; the storage objects are an orphan-cleanup gap, flagged for
-        // Module 14's audit rather than papered over with a call that would
-        // silently no-op or throw.
+        // The image files are NOT removed here: @base44/sdk 0.8.49's Core
+        // integrations have no delete-file method at all (re-checked
+        // 2026-09-23). For a private upload that is a storage cost, not a
+        // leak -- a file_uri only becomes viewable through content's
+        // imageUrls, which signs only for a Drawing row that still exists and
+        // belongs to the caller's family, and that row is deleted just below.
+        // A LEGACY public upload (image_url) stays reachable at its old link;
+        // deleting the row cannot take that back.
         await base44.asServiceRole.entities.Drawing.deleteMany({ family_id: familyId });
         await base44.asServiceRole.entities.Comment.deleteMany({ family_id: familyId });
         await base44.asServiceRole.entities.Reaction.deleteMany({ family_id: familyId });
@@ -322,6 +392,11 @@ export default async function (req: Request): Promise<Response> {
             family_id: null,
             family_role: null,
           });
+        }
+
+        const requesters = await base44.asServiceRole.entities.User.filter({ pending_family_id: familyId });
+        for (const requester of requesters) {
+          await base44.asServiceRole.entities.User.update(requester.id, { pending_family_id: null });
         }
 
         await base44.asServiceRole.entities.Family.delete(familyId);
@@ -346,13 +421,26 @@ export default async function (req: Request): Promise<Response> {
           base44.entities.Reaction.filter({ family_id: fresh.family_id }),
         ]);
 
+        // A private file_uri means nothing outside the app, so each drawing
+        // carries a download link instead. Signed for a day: long enough to
+        // fetch the export, short enough that a forwarded file goes stale.
+        const exportedDrawings = await Promise.all(drawings.map(async (d: Record<string, unknown>) => {
+          if (!d.image_file_uri) return d;
+          const { signed_url } = await base44.asServiceRole.integrations.Core.CreateFileSignedUrl({
+            file_uri: d.image_file_uri as string,
+            expires_in: EXPORT_LINK_SECONDS,
+          });
+          return { ...d, image_download_url: signed_url };
+        }));
+
         return Response.json({
           exported_at: new Date().toISOString(),
+          image_links_expire_in_seconds: EXPORT_LINK_SECONDS,
           family: { name: family.name, billing_status: family.billing_status },
           children,
           parents,
           relatives,
-          drawings,
+          drawings: exportedDrawings,
           comments,
           reactions,
         });

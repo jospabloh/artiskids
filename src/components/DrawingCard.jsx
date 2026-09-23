@@ -3,7 +3,7 @@ import { Image } from "@/components/ui/image";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 
-export default function DrawingCard({ drawing }) {
+export default function DrawingCard({ drawing, imageUrl }) {
   const date = drawing.drawn_date ? format(parseISO(drawing.drawn_date), "d 'de' MMMM, yyyy", { locale: es }) : null;
   return (
     <Link
@@ -11,12 +11,16 @@ export default function DrawingCard({ drawing }) {
       className="group block bg-white rounded-2xl overflow-hidden border border-stone-100 shadow-sm hover:shadow-md transition"
     >
       <div className="aspect-[4/3] bg-stone-50 overflow-hidden">
-        <Image
-          src={drawing.image_url}
-          alt={drawing.title}
-          fittingType="fit"
-          className="w-full h-full object-contain group-hover:scale-[1.02] transition duration-300"
-        />
+        {imageUrl ? (
+          <Image
+            src={imageUrl}
+            alt={drawing.title}
+            fittingType="fit"
+            className="w-full h-full object-contain group-hover:scale-[1.02] transition duration-300"
+          />
+        ) : (
+          <div className="w-full h-full animate-pulse bg-stone-100" />
+        )}
       </div>
       <div className="p-4">
         <div className="flex items-start justify-between gap-2">

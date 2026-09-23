@@ -7,7 +7,7 @@ import { notifyMissionControl } from "@/lib/notifyMissionControl";
 import SupportEscapeHatch from "@/components/SupportEscapeHatch";
 import { FAMILY_ROLE_LABELS, isFamilyAdmin } from "@/lib/rbac";
 import { quotaBytesFor, formatBytes } from "@/lib/storageQuota";
-import { Users, Download, Smartphone, ShieldAlert, Loader2, Trash2 } from "lucide-react";
+import { Users, UserPlus, Download, Smartphone, ShieldAlert, Loader2, Trash2 } from "lucide-react";
 
 const BILLING_LABELS = {
   trial: "Prueba",
@@ -24,6 +24,7 @@ export default function Account() {
   const [family, setFamily] = useState(null);
   const [members, setMembers] = useState([]);
   const [sessions, setSessions] = useState([]);
+  const [joinRequests, setJoinRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
@@ -39,14 +40,18 @@ export default function Account() {
     setLoading(true);
     setLoadFailed(false);
     try {
-      const [fam, memberData, sessionData] = await Promise.all([
+      const [fam, memberData, sessionData, requestData] = await Promise.all([
         base44.entities.Family.get(user.family_id),
         callFunction("family", "listMembers"),
         callFunction("session", "listSessions"),
+        // Admin-only on the server; a member would get a 403 and trip the
+        // load-failure screen, so members don't ask.
+        admin ? callFunction("family", "listJoinRequests") : null,
       ]);
       setFamily(fam);
       setMembers(memberData?.members ?? []);
       setSessions(sessionData?.sessions ?? []);
+      setJoinRequests(requestData?.requests ?? []);
     } catch (err) {
       setLoadFailed(true);
       notifyMissionControl({ user, message: "No pudo cargar su página de cuenta en ArtisKids -- error al leer la familia o llamar las funciones family/session." });
@@ -87,6 +92,12 @@ export default function Account() {
   const delegate = (targetUserId) =>
     run(`delegate:${targetUserId}`, async () => {
       await callFunction("family", "delegateAdmin", { target_user_id: targetUserId });
+      await load();
+    });
+
+  const answerJoinRequest = (targetUserId, approve) =>
+    run(`join:${targetUserId}`, async () => {
+      await callFunction("family", approve ? "approveJoinRequest" : "rejectJoinRequest", { target_user_id: targetUserId });
       await load();
     });
 
@@ -215,6 +226,40 @@ export default function Account() {
           </p>
         )}
       </section>
+
+      {admin && joinRequests.length > 0 && (
+        <section className="bg-amber-50 rounded-2xl border border-amber-200 p-5">
+          <h2 className="font-heading font-semibold text-stone-800 mb-1 flex items-center gap-2">
+            <UserPlus className="w-4 h-4 text-amber-600" /> Solicitudes para unirse ({joinRequests.length})
+          </h2>
+          <p className="text-xs text-stone-500 mb-4">
+            Usaron el código de invitación. Aprueba solo a quien conozcas: verán todos los dibujos de la familia.
+          </p>
+          <div className="space-y-2">
+            {joinRequests.map((r) => (
+              <div key={r.id} className="flex items-center justify-between gap-3 bg-white rounded-xl px-3 py-2.5">
+                <div className="min-w-0 text-sm font-medium text-stone-700 truncate">{r.email}</div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    onClick={() => answerJoinRequest(r.id, true)}
+                    disabled={busy === `join:${r.id}`}
+                    className="text-xs px-3 py-1.5 rounded-full bg-amber-500 text-white font-medium hover:bg-amber-600 disabled:opacity-60 transition"
+                  >
+                    Aprobar
+                  </button>
+                  <button
+                    onClick={() => answerJoinRequest(r.id, false)}
+                    disabled={busy === `join:${r.id}`}
+                    className="text-xs px-3 py-1.5 rounded-full border border-stone-200 text-stone-500 hover:border-rose-300 hover:text-rose-500 disabled:opacity-60 transition"
+                  >
+                    Rechazar
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       <section className="bg-white rounded-2xl border border-stone-100 shadow-sm p-5">
         <h2 className="font-heading font-semibold text-stone-800 mb-4 flex items-center gap-2">

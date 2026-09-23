@@ -12,6 +12,17 @@
       },
       "type": "string"
     },
+    "pending_family_id": {
+      "description": "A join request waiting on that family's admin (Module 2: an invite code requests access, it never grants it). Set by redeemCode, cleared by approveJoinRequest/rejectJoinRequest/cancelJoinRequest. Grants nothing: every RLS rule compares family_id, never this. Write-locked like family_id, so a user cannot point it at a family or approve themselves.",
+      "rls": {
+        "write": {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      },
+      "type": "string"
+    },
     "family_role": {
       "description": "Role within family_id. Same write lock as family_id, same reasoning.",
       "enum": [

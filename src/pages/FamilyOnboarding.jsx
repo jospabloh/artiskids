@@ -1,10 +1,10 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
 import { callFunction } from "@/lib/functions";
 import { notifyMissionControl } from "@/lib/notifyMissionControl";
 import SupportEscapeHatch from "@/components/SupportEscapeHatch";
-import { Users, Loader2, ArrowRight } from "lucide-react";
+import { Users, Loader2, ArrowRight, Hourglass } from "lucide-react";
 
 // Module 18-retired's entry point: an authenticated user with no family_id
 // lands here (see the RequireFamily gate in App.jsx) and either creates a
@@ -33,6 +33,40 @@ export default function FamilyOnboarding() {
   // backend that just failed) since it's a plain external link.
   const [fatalError, setFatalError] = useState(false);
   const [loading, setLoading] = useState(false);
+  // A join code only REQUESTS access (Module 2); the family's admin approves
+  // it from Mi cuenta. Driven by user.pending_family_id rather than local
+  // state, because checkUserAuth() remounts this page and a reload must
+  // land back on the waiting screen too.
+  const [pendingFamilyName, setPendingFamilyName] = useState(null);
+  const hasPendingRequest = Boolean(user?.pending_family_id) && !user?.family_id;
+
+  useEffect(() => {
+    if (!hasPendingRequest) return;
+    callFunction("family", "joinRequestStatus")
+      .then((data) => setPendingFamilyName(data?.pending?.family_name ?? null))
+      .catch(() => {});
+  }, [hasPendingRequest]);
+
+  const checkApproval = async () => {
+    setLoading(true);
+    try {
+      await checkUserAuth();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const cancelRequest = async () => {
+    setLoading(true);
+    try {
+      await callFunction("family", "cancelJoinRequest");
+      await checkUserAuth();
+    } catch {
+      setFatalError(true);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const afterSuccess = async () => {
     // The caller's own User row now carries family_id/family_role -- refresh
@@ -70,7 +104,9 @@ export default function FamilyOnboarding() {
     setLoading(true);
     try {
       await callFunction("family", "redeemCode", { join_code: joinCode.trim().toUpperCase() });
-      await afterSuccess();
+      // Not a member yet: refreshing the user brings back pending_family_id,
+      // which switches this page to the waiting screen.
+      await checkUserAuth();
     } catch (err) {
       if (err.isRouterError) setError(err.message);
       else {
@@ -81,6 +117,8 @@ export default function FamilyOnboarding() {
       setLoading(false);
     }
   };
+
+  if (user?.family_id) return <Navigate to="/" replace />;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#fdf8f3] px-4">
@@ -109,6 +147,35 @@ export default function FamilyOnboarding() {
                 className="w-full text-sm text-stone-400 hover:text-stone-600"
               >
                 Intentar de nuevo
+              </button>
+            </div>
+          ) : hasPendingRequest ? (
+            <div className="text-center space-y-4">
+              <div className="w-12 h-12 mx-auto rounded-2xl bg-amber-50 flex items-center justify-center">
+                <Hourglass className="w-6 h-6 text-amber-500" />
+              </div>
+              <div>
+                <p className="font-semibold text-stone-800">Solicitud enviada</p>
+                <p className="text-sm text-stone-500 mt-1">
+                  {pendingFamilyName ? <>Pediste unirte a <span className="font-medium text-stone-700">{pendingFamilyName}</span>. </> : null}
+                  Un administrador de la familia tiene que aprobarte desde <span className="font-medium">Mi cuenta</span>. Avísale para que no espere.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={checkApproval}
+                disabled={loading}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-amber-500 text-white font-semibold hover:bg-amber-600 disabled:opacity-60 transition"
+              >
+                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Ya me aprobaron"}
+              </button>
+              <button
+                type="button"
+                onClick={cancelRequest}
+                disabled={loading}
+                className="w-full text-sm text-stone-400 hover:text-stone-600"
+              >
+                Cancelar solicitud
               </button>
             </div>
           ) : (
@@ -190,7 +257,7 @@ export default function FamilyOnboarding() {
                 disabled={loading}
                 className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-amber-500 text-white font-semibold hover:bg-amber-600 disabled:opacity-60 transition"
               >
-                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Unirme"}
+                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Pedir unirme"}
               </button>
               <button
                 type="button"

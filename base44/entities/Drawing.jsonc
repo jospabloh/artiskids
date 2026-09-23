@@ -22,7 +22,12 @@
       "description": "The uploaded image's byte size, set by content/entry.ts's createDrawing from the client's File.size. Feeds Family.storage_used_bytes -- without a real per-drawing size, the family's running total can't be maintained or reversed on delete.",
       "type": "number"
     },
+    "image_file_uri": {
+      "description": "Private-storage reference from UploadPrivateFile. Not a URL and not viewable by itself: content/entry.ts's imageUrls action turns it into a short-lived signed link, and only after checking the drawing belongs to the caller's family. Every drawing uploaded since 2026-09-23 uses this.",
+      "type": "string"
+    },
     "image_url": {
+      "description": "LEGACY public URL (UploadPublicFile), readable by anyone who has it, no login. Kept only so drawings uploaded before 2026-09-23 still display; createDrawing no longer accepts it. Re-upload such a drawing to make it private -- deleting the row does not delete the public file.",
       "type": "string"
     },
     "title": {
@@ -31,7 +36,6 @@
   },
   "required": [
     "title",
-    "image_url",
     "creator_name"
   ],
   "rls": {
