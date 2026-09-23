@@ -689,9 +689,60 @@ no login at its stored URL (HTTP 200, 3.1 MB). Now:
 - Legacy `image_url` rows still display, and **their public link cannot be
   revoked** — `@base44/sdk` 0.8.49 has no delete-file method. Re-upload them.
 
-**Deploy order matters**: schema synced → `base44 functions deploy content`,
-`family` → publish frontend. Frontend-first breaks uploads until the functions
+**Deploy order matters**: schema applied → `base44 functions deploy content`,
+`family` → publish frontend. **GitHub sync does not apply an entity schema to
+the live database** — it only copies the `.jsonc`. After PR #17 merged, the
+live `Drawing`/`User` schemas were still the old ones; they went live only via
+`update_entity_schema`, confirmed with `list_entity_schemas`.
+
+**And `base44 functions deploy` ships the local working tree, not `main`.**
+The first deploy of PR #17 ran right after a `git pull` that had aborted on a
+local `package-lock.json` change, so `content`/`family` went out from the
+stale `37e6d59` and uploads broke until a `git stash; git pull` and redeploy
+from `8fce1eb`. Before any functions deploy: `git log --oneline -1` must show
+`origin/main`'s head. Frontend-first breaks uploads until the functions
 land (the old `createDrawing` still requires `image_url`).
+
+## Session reap probe (Module 20, 2026-09-23)
+
+To prove the hourly `purgeStaleSessions` job, a fake `AppSession` was written
+with `last_active_at` 50 hours old (`device_id: reap-probe-2026-09-23`). It was
+still `active` at 22:48 UTC, after four scheduled runs (19:00–22:00). The job's filter itself was
+confirmed to match it (`status $ne revoked`, `last_active_at $lt cutoff` via
+`query_entities`), so the job either isn't being invoked or its guard refuses
+the scheduler: `requireCron` wants `Authorization: Bearer <CRON_SECRET>`, and
+nothing shows that Base44's scheduler sends that header. The function logs
+that would tell the two apart aren't reachable from the API; the Base44
+dashboard's function logs are the place to look.
+
+The probe row could not be deleted: `DELETE /api/apps/{id}/entities/AppSession/{row}`
+answered "not found" for a row `query_entities` returned in the same minute. It
+was set to `revoked` / `revoked_by: probe-cleanup` instead
+(`reap-probe@invalid.test`, one row). Delete it from the dashboard if it bothers.
+
+Reading the revocation path turned up a worse bug: **`manageSession` set any
+row it found back to `active`, revoked included.** "Cerrar" in Mi cuenta, or a
+reap, lasted only until that device next opened the app.
+
+Fixed without depending on the scheduler (`session/_sessionRules.ts`, tested
+in `base44/functions/sessionRules.test.ts`):
+
+- `manageSession` and `sessionHeartbeat` refuse a row that is revoked **or**
+  silent for more than 48h (403, marked `revoked_by: system`).
+- The refusal also rewrites that row's `device_id` to `retired:<row id>:…`.
+  The browser keeps its `device_id` in `localStorage` across logouts (shared
+  `useSessionManager.js`), so without this a revoked row would lock that
+  browser out forever; with it, the device is refused once and its next open
+  gets a fresh row.
+- `listSessions` shows a 48h-stale device as *Cerrada*; `trackActivity` never
+  bumps a stale row.
+
+The reap job stays, fail-closed, as housekeeping. **Still open, and
+portfolio-wide rather than this app's:** the shared `SessionExpiredDialog`'s
+"Volver a iniciar sesión" calls `redirectToLogin()` without `logout()`, so the
+Base44 login survives and a reload walks straight back in with a new session
+row. Real re-authentication on revocation needs that shared file changed in
+`acacia-app-standard`, not here.
 
 ## Module 14 — multi-tenant isolation audit (2026-09-23)
 
@@ -762,7 +813,9 @@ rule, so it grants nothing). The family's admin sees the request in Mi cuenta;
       server-side; Mission Control's unified cron now covers the app
       (registered, synced). New-tenant ping fires; MC has no receiver yet.
 - [x] 2 Roles — two roles, one gated code path, zero-admin guard; invite
-      code is request-then-approve (PR #17, not yet deployed).
+      code is request-then-approve (PR #17, live since 2026-09-23 — the served
+      bundle carries "Solicitudes para unirse"). Not yet exercised with a
+      second real account.
 - [~] 3 Permissions — one registry, server re-check on every write, billing
       gate. **Gap: Permisos is a read-only view**, not the editable matrix.
 - [~] 4 RLS — four-op `$or` everywhere, deployed = repo. `validate:rls`
@@ -780,12 +833,15 @@ rule, so it grants nothing). The family's admin sees the request in Mi cuenta;
 - [x] 14 Isolation audit — above, 2026-09-23, with its could-not-verify list.
 - [x] 15 Bridge — derived key, `ACCEPT_LEGACY_MASTER = false`, proven by sync.
 - [~] 16 Secrets — `ACACIA_APP_SLUG` and `INGEST_HMAC_SECRET` proven by a
-      successful sync; `CRON_SECRET` see Module 20; `PLATFORM_OWNER_EMAIL` unproven.
+      successful sync; `CRON_SECRET` unproven (the reap job never ran, see
+      Module 20); `PLATFORM_OWNER_EMAIL` unproven.
 - [x] 17 Mission Control side — row, adapter, config entries, sync proven.
 - [x] 18 Retired — one account, one family; 409 on a second.
 - [x] 19 Locks state their rationale in their own field descriptions.
-- [~] 20 Session control — idle warning, device list, revoke. Reap job: see
-      "Session reap probe".
+- [~] 20 Session control — idle warning, device list, revoke, and the 48h
+      rule now enforced inside `session` itself (see "Session reap probe").
+      Gaps: the scheduled reap job has not been seen to run; the shared
+      expired-session dialog's re-login button doesn't end the Base44 login.
 - [x] 21 About screen.
 - [x] 22 Server-authoritative diffing — `getFreshCaller` in every router.
 - [x] 23 Nav survives reload — route-derived, no collapsible state.
