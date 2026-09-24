@@ -10,6 +10,9 @@
 // Precedence, checked in this order by both sides:
 //   1. platform owner / User.role === "admin" -> always allowed.
 //   2. a RolePermission override for (family_id, role, key) -> its value.
+//      Never for the Familia section: those keys are registry-only on the
+//      server (a row granting them = a path to family_admin). Rows are
+//      writable only by the service tier, never by a family member.
 //   3. this registry's own default for (section, action, role).
 //   4. gated by Family.billing_status first (view_only/suspended reject
 //      every write action, checked before 1-3 even run).

@@ -77,29 +77,25 @@ async function countFamilyAdmins(
 }
 
 /**
- * Module 3's precedence, for the two Familia registry keys this router
- * gates on (manage_members, danger_zone): platform owner always wins; a
- * RolePermission row for (family_id, role, key) overrides the registry's
- * own default; absent either, the registry default decides. Deliberately
- * does NOT apply Family.billing_status here -- unlike content writes, a
- * suspended or view_only family must still be able to leave or delete
- * itself; billing_status blocks login itself before Phase 4's routed auth
- * ever reaches these actions, so gating them again here would only ever
+ * Gates the two Familia registry keys this router checks (manage_members,
+ * danger_zone): platform owner always wins, otherwise the registry default
+ * decides. RolePermission overrides are deliberately NOT consulted here --
+ * a row that could grant these keys is a row that could promote its writer
+ * to family_admin or let them run deleteFamily, so the Familia section is
+ * never delegable through data, only through the registry itself (security
+ * finding 2026-09-24: a member could self-create such a row). Also
+ * deliberately does NOT apply Family.billing_status -- unlike content
+ * writes, a suspended or view_only family must still be able to leave or
+ * delete itself; billing_status blocks login itself before Phase 4's routed
+ * auth ever reaches these actions, so gating them again here would only ever
  * trap someone who got in some other way, never protect anything.
  */
-async function canManageFamily(
-  base44: Base44Client,
+function canManageFamily(
   fresh: Record<string, unknown>,
   key: "manage_members" | "danger_zone",
-): Promise<boolean> {
+): boolean {
   if (fresh.role === "admin") return true;
   if (!fresh.family_id || !fresh.family_role) return false;
-  const overrides = await base44.asServiceRole.entities.RolePermission.filter({
-    family_id: fresh.family_id as string,
-    role: fresh.family_role as string,
-    permission_key: `Familia:${key}`,
-  });
-  if (overrides.length > 0) return Boolean(overrides[0].allowed);
   return defaultAllowed("Familia", key, fresh.family_role as string);
 }
 
@@ -220,7 +216,7 @@ export default async function (req: Request): Promise<Response> {
       case "listJoinRequests": {
         const fresh = await getFreshCaller(base44, caller.id);
         if (!fresh.family_id) return Response.json({ error: "not in a family" }, { status: 403 });
-        if (!(await canManageFamily(base44, fresh, "manage_members"))) {
+        if (!canManageFamily(fresh, "manage_members")) {
           return Response.json({ error: "not allowed to manage members" }, { status: 403 });
         }
         const requesters = await base44.asServiceRole.entities.User.filter({ pending_family_id: fresh.family_id });
@@ -237,7 +233,7 @@ export default async function (req: Request): Promise<Response> {
 
         const fresh = await getFreshCaller(base44, caller.id);
         if (!fresh.family_id) return Response.json({ error: "not in a family" }, { status: 403 });
-        if (!(await canManageFamily(base44, fresh, "manage_members"))) {
+        if (!canManageFamily(fresh, "manage_members")) {
           return Response.json({ error: "not allowed to manage members" }, { status: 403 });
         }
         // Checked against the requester's STORED row, never the request body:
@@ -276,7 +272,7 @@ export default async function (req: Request): Promise<Response> {
         if (newRole !== FAMILY_ADMIN && newRole !== MEMBER) return badRequest("invalid new_role");
 
         const fresh = await getFreshCaller(base44, caller.id);
-        if (!(await canManageFamily(base44, fresh, "manage_members"))) {
+        if (!canManageFamily(fresh, "manage_members")) {
           return Response.json({ error: "not allowed to manage members" }, { status: 403 });
         }
         const target = await base44.asServiceRole.entities.User.get(targetUserId);
@@ -307,7 +303,7 @@ export default async function (req: Request): Promise<Response> {
         }
 
         const fresh = await getFreshCaller(base44, caller.id);
-        if (!(await canManageFamily(base44, fresh, "manage_members"))) {
+        if (!canManageFamily(fresh, "manage_members")) {
           return Response.json({ error: "not allowed to manage members" }, { status: 403 });
         }
         const target = await base44.asServiceRole.entities.User.get(targetUserId);
@@ -365,7 +361,7 @@ export default async function (req: Request): Promise<Response> {
         // this checks family_id itself rather than folding it into the
         // helper the way manage_members does.
         if (!fresh.family_id) return Response.json({ error: "not in a family" }, { status: 403 });
-        if (!(await canManageFamily(base44, fresh, "danger_zone"))) {
+        if (!canManageFamily(fresh, "danger_zone")) {
           return Response.json({ error: "not allowed to delete this family" }, { status: 403 });
         }
         const familyId = fresh.family_id;
