@@ -5,6 +5,7 @@
 // shared/session/README.md for the full three-layer spec this implements
 // Layer 2 of; Layer 3 (the reap job) is base44/functions/purgeStaleSessions/.
 import { createClientFromRequest } from "npm:@base44/sdk";
+import { isDead, isStale, retiredDeviceId, type SessionRow } from "./_sessionRules.ts";
 
 function badRequest(message: string, status = 400): Response {
   return Response.json({ error: message }, { status });
@@ -14,6 +15,27 @@ type Base44Client = ReturnType<typeof createClientFromRequest>;
 
 async function getFreshCaller(base44: Base44Client, callerId: string) {
   return await base44.asServiceRole.entities.User.get(callerId);
+}
+
+// The 48h rule is enforced here too, at the moment a device actually shows
+// up, so it holds even when the scheduled reap job hasn't run -- on
+// 2026-09-23 a probe row 50h stale stayed 'active' through four hourly runs.
+// The job is housekeeping; this is the guarantee.
+//
+// A dead session is refused exactly once per device, and in the same write
+// its device_id is retired so that device's next manageSession creates a new
+// row instead of hitting this one again. Without that, a browser keeps its
+// device_id in localStorage across logouts (useSessionManager.js, shared, not
+// editable here) and a revoked row would lock it out for good.
+async function refuseDeadSession(base44: Base44Client, session: SessionRow): Promise<Response> {
+  const now = new Date().toISOString();
+  await base44.asServiceRole.entities.AppSession.update(String(session.id), {
+    device_id: retiredDeviceId(session),
+    ...(session.status === "revoked"
+      ? {}
+      : { status: "revoked", revoked_at: now, revoked_by: "system" }),
+  });
+  return Response.json({ error: "session revoked" }, { status: 403 });
 }
 
 export default async function (req: Request): Promise<Response> {
@@ -62,6 +84,13 @@ export default async function (req: Request): Promise<Response> {
           device_id: deviceId,
         });
 
+        // This used to set any row it found back to 'active', revoked
+        // included -- so "Cerrar" in Mi cuenta, or the reap job, was undone
+        // the next time that device opened the app.
+        if (existing[0] && isDead(existing[0])) {
+          return await refuseDeadSession(base44, existing[0]);
+        }
+
         let session;
         if (existing[0]) {
           session = await base44.asServiceRole.entities.AppSession.update(existing[0].id, {
@@ -109,8 +138,8 @@ export default async function (req: Request): Promise<Response> {
         // This is the check that makes Layer 3 (the reap job) and a remote
         // force-logout actually take effect -- revoking a session server-side
         // does nothing until the next heartbeat reads it back.
-        if (session.status === "revoked") {
-          return Response.json({ error: "session revoked" }, { status: 403 });
+        if (isDead(session)) {
+          return await refuseDeadSession(base44, session);
         }
 
         await base44.asServiceRole.entities.AppSession.update(sessionId, {
@@ -135,7 +164,8 @@ export default async function (req: Request): Promise<Response> {
           "-last_active_at",
           1,
         );
-        if (sessions[0]) {
+        // A stale row must not be revived by a bump from another device.
+        if (sessions[0] && !isStale(sessions[0])) {
           await base44.asServiceRole.entities.AppSession.update(sessions[0].id, {
             last_active_at: new Date().toISOString(),
           });
@@ -153,6 +183,19 @@ export default async function (req: Request): Promise<Response> {
           { family_id: fresh.family_id, user_email: fresh.email },
           "-last_active_at",
         );
+        // Show a 48h-stale device as closed, not "activo". Its device_id is
+        // left alone: that device hasn't been told yet, and it gets told
+        // (and retired) the next time it calls manageSession or heartbeats.
+        const now = new Date().toISOString();
+        for (const s of sessions) {
+          if (s.status === "revoked" || !isStale(s)) continue;
+          Object.assign(s, { status: "revoked", revoked_at: now, revoked_by: "system" });
+          await base44.asServiceRole.entities.AppSession.update(s.id, {
+            status: "revoked",
+            revoked_at: now,
+            revoked_by: "system",
+          });
+        }
         return Response.json({ sessions });
       }
 
