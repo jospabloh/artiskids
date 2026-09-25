@@ -804,6 +804,44 @@ rule, so it grants nothing). The family's admin sees the request in Mi cuenta;
   fine (Base44 itself stores unset optional strings as `null`, observed on
   `AppSession`), but never executed against a real `User`.
 
+## Security scanner fixes (2026-09-24 → 2026-09-25, PRs #19 and #20)
+
+- **`RolePermission` let a `member` promote themselves.** Its create/update/
+  delete RLS was family-scoped, so a member could write
+  `{role:'member', permission_key:'Familia:manage_members', allowed:true}`
+  and then call `setMemberRole` on themselves (or `danger_zone` →
+  `deleteFamily`). Fixed on both sides: `canManageFamily` no longer reads
+  overrides (the `Familia` keys are registry-only), and the entity's writes
+  are admin-only. Nothing in the client writes `RolePermission`. Production
+  had 0 rows, so nothing suggests it was exploited.
+- **The storage quota trusted `file_size_bytes` from the client.**
+  `createDrawing` now signs the stored `file_uri`, downloads it and counts the
+  bytes (`countBytesUpTo`, it stops as soon as it goes over). The client still
+  sends the field so deploy order doesn't matter; the server ignores it.
+- **`MISSION_CONTROL_INGEST_URL` / `ACACIA_MC_INGEST_URL`**, secrets nobody
+  ever registered, only let someone redirect HMAC-signed payloads. The URLs
+  are now constants.
+
+**Applying a schema when the Base44 MCP has no access.** On 2026-09-25
+`list_entity_schemas`/`update_entity_schema` answered "Unable to access this
+app" (while `query_entities` did work), and `execute_api` rejects the
+`entity-schemas` endpoints for the MCP token. The route that worked:
+`npx base44 entities push` from a checkout sitting at the head of
+`origin/main`. It pushes **all 11** entities and replaces whatever is live
+(deleting anything missing locally), so it is only safe when the repo already
+matches production. It reports every entity as "Updated" even when nothing
+changed, so that list proves nothing. The CLI can't read a schema back:
+verification was a screenshot of Datos → RolePermission → Permisos in the
+dashboard.
+
+Related: `base44 functions deploy` answered `unchanged` for `family`,
+`content` and `support` after the merge, meaning GitHub sync had already
+deployed them; it can't be verified by content from outside, because every
+function answers 401 before running its logic. The real proof of the quota fix
+is a real upload — **still pending as of this note**. If it fails with
+"no se pudo verificar el archivo subido", the runtime can't `fetch` its own
+signed link and uploads are blocked.
+
 ## ACACIA Portfolio Standard — status (audited 2026-09-23)
 
 `[x]` done and proven where proof is possible · `[~]` done with a named gap ·
