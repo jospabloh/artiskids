@@ -1,0 +1,17 @@
+{
+  "name": "RetiredFile",
+  "properties": {
+    "file_uri": {
+      "description": "Private file_uri of a Drawing that was deleted (alone or with its family). The SDK can't delete the file itself, so its URI stays signable; createDrawing refuses any URI listed here so an ex-member who kept it can't re-attach it to another family's drawing (security finding 2026-09-25). Service tier only -- no family ever reads or writes this.",
+      "type": "string"
+    }
+  },
+  "required": ["file_uri"],
+  "rls": {
+    "create": { "user_condition": { "role": "admin" } },
+    "delete": { "user_condition": { "role": "admin" } },
+    "read": { "user_condition": { "role": "admin" } },
+    "update": { "user_condition": { "role": "admin" } }
+  },
+  "type": "object"
+}

@@ -95,14 +95,18 @@ export default async function (req: Request): Promise<Response> {
           return badRequest("title, creator_name and image_file_uri are required");
         }
 
-        // A file_uri already on any Drawing, of any family, is never accepted
-        // again: otherwise someone who kept another family's URIs (an ex-member)
-        // could attach them here and have imageUrls sign those photos for them.
-        // A fresh upload always has a new URI, so this never blocks a real one.
-        // Partial: it can't tell who uploaded a URI no Drawing uses (security
-        // finding 2026-09-25; see CLAUDE.md).
-        const taken = await base44.asServiceRole.entities.Drawing.filter({ image_file_uri: imageFileUri });
-        if (taken.length > 0) {
+        // A file_uri that ever belonged to a Drawing -- live in any family, or
+        // deleted (RetiredFile; the SDK can't delete the file itself) -- is
+        // never accepted again. Otherwise an ex-member who kept another
+        // family's URIs could attach them here and have imageUrls sign those
+        // photos for them. A fresh upload always has a new URI, so this never
+        // blocks a real one; an unattached upload's URI is known only to its
+        // own uploader (security findings 2026-09-25).
+        const [liveUse, retired] = await Promise.all([
+          base44.asServiceRole.entities.Drawing.filter({ image_file_uri: imageFileUri }),
+          base44.asServiceRole.entities.RetiredFile.filter({ file_uri: imageFileUri }),
+        ]);
+        if (liveUse.length > 0 || retired.length > 0) {
           return Response.json({ error: "ese archivo ya pertenece a otro dibujo" }, { status: 409 });
         }
 
@@ -179,6 +183,11 @@ export default async function (req: Request): Promise<Response> {
         const drawing = await base44.asServiceRole.entities.Drawing.get(id);
         if (drawing.family_id !== familyId) {
           return Response.json({ error: "drawing is not in your family" }, { status: 403 });
+        }
+        // Retire the URI before the row goes: if this write fails, nothing is
+        // deleted and the URI stays blocked through the live Drawing.
+        if (drawing.image_file_uri) {
+          await base44.asServiceRole.entities.RetiredFile.create({ file_uri: drawing.image_file_uri });
         }
         await base44.asServiceRole.entities.Comment.deleteMany({ drawing_id: id });
         await base44.asServiceRole.entities.Reaction.deleteMany({ drawing_id: id });
