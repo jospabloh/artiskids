@@ -841,20 +841,41 @@ rule, so it grants nothing). The family's admin sees the request in Mi cuenta;
 app" (while `query_entities` did work), and `execute_api` rejects the
 `entity-schemas` endpoints for the MCP token. The route that worked:
 `npx base44 entities push` from a checkout sitting at the head of
-`origin/main`. It pushes **all 11** entities and replaces whatever is live
+`origin/main`. It pushes **all** entities (12 since `RetiredFile`) and replaces whatever is live
 (deleting anything missing locally), so it is only safe when the repo already
 matches production. It reports every entity as "Updated" even when nothing
 changed, so that list proves nothing. The CLI can't read a schema back:
 verification was a screenshot of Datos → RolePermission → Permisos in the
 dashboard.
 
-Related: `base44 functions deploy` answered `unchanged` for `family`,
-`content` and `support` after the merge, meaning GitHub sync had already
-deployed them; it can't be verified by content from outside, because every
-function answers 401 before running its logic. The real proof of the quota fix
-is a real upload — **still pending as of this note**. If it fails with
-"no se pudo verificar el archivo subido", the runtime can't `fetch` its own
-signed link and uploads are blocked.
+**What `base44 functions deploy` answers means (settled 2026-09-25).**
+GitHub sync **does** deploy functions when a merge lands on `main`: across
+PRs #19–#24, every `functions deploy` run seconds after a merge from an
+up-to-date tree answered `unchanged`. The day it answered `deployed` was the
+day the tree was stale — `git checkout main` left the local branch **2
+commits behind** `origin/main` ("Tu rama está detrás…"), and `content` and
+`family` went out with #23's code over #24's, which sync had already
+deployed. Nothing crashed only because #23 didn't use `RetiredFile` yet; it
+was fixed with `git pull` and a redeploy (`deployed` again, now forward).
+So:
+
+- `unchanged` right after a merge = sync already deployed it. Fine.
+- `deployed` right after a merge = **your tree differs from `main`**. Stop
+  and check `git status` before trusting it: you just reverted to whatever
+  your checkout had.
+- Never run `functions deploy` if `git status` says "detrás de
+  'origin/main'". And don't put `# comments` on commands you paste into
+  zsh: they break (`argumento ambiguo '#'`, `missing end of string`).
+- **An entity the functions use must exist before the merge**, because sync
+  deploys the functions on the merge itself. #24 was merged before
+  `RetiredFile` was pushed and production spent a few minutes without that
+  entity (`query_entities`: "Entity schema RetiredFile not found"). Push
+  the schema from the PR branch first (`npx base44 entities push`), then
+  merge.
+
+The real proof of the quota fix is a real upload — **still pending as of
+this note**. If it fails with "no se pudo verificar el archivo subido", the
+runtime can't `fetch` its own signed link and uploads are blocked.
 
 ## ACACIA Portfolio Standard — status (audited 2026-09-23)
 
