@@ -219,6 +219,10 @@ export default async function (req: Request): Promise<Response> {
         return badRequest(`unknown action: ${action}`, 404);
     }
   } catch (e) {
-    return Response.json({ error: e instanceof Error ? e.message : String(e) }, { status: 500 });
+    // The detail goes to the function log, never to the caller: an SDK or
+    // platform message can name entities, fields or ids (scanner finding
+    // 2026-09-25). Callers only need to know it wasn't their input.
+    console.error("session failed:", e);
+    return Response.json({ error: "internal error" }, { status: 500 });
   }
 }
