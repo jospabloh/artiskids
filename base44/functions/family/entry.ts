@@ -422,12 +422,15 @@ export default async function (req: Request): Promise<Response> {
         // carries a download link instead. Signed for a day: long enough to
         // fetch the export, short enough that a forwarded file goes stale.
         const exportedDrawings = await Promise.all(drawings.map(async (d: Record<string, unknown>) => {
-          if (!d.image_file_uri) return d;
+          // The raw file_uri is left out: it outlives the family membership
+          // (the file itself can't be deleted), so it must not travel.
+          const { image_file_uri, ...rest } = d;
+          if (!image_file_uri) return rest;
           const { signed_url } = await base44.asServiceRole.integrations.Core.CreateFileSignedUrl({
-            file_uri: d.image_file_uri as string,
+            file_uri: image_file_uri as string,
             expires_in: EXPORT_LINK_SECONDS,
           });
-          return { ...d, image_download_url: signed_url };
+          return { ...rest, image_download_url: signed_url };
         }));
 
         return Response.json({
