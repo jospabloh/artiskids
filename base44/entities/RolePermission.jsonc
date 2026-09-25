@@ -13,7 +13,7 @@
       "type": "string"
     },
     "permission_key": {
-      "description": "A key from src/lib/permissionRegistry.js, e.g. \"Dibujos:upload\". One row per (family_id, role, permission_key) override -- absence of a row means the registry's own default applies.",
+      "description": "A key from src/lib/permissionRegistry.js, e.g. \"Dibujos:upload\". One row per (family_id, role, permission_key) override -- absence of a row means the registry's own default applies. Rows are create/update/delete admin-only (service tier): a family-scoped write let a member grant itself Familia:manage_members and promote itself (security fix 2026-09-24). Familia:* rows are ignored server-side regardless.",
       "type": "string"
     },
     "allowed": {
@@ -22,30 +22,15 @@
   },
   "required": ["family_id", "role", "permission_key", "allowed"],
   "rls": {
-    "create": {
-      "$or": [
-        { "data.family_id": "{{user.data.family_id}}" },
-        { "user_condition": { "role": "admin" } }
-      ]
-    },
-    "delete": {
-      "$or": [
-        { "data.family_id": "{{user.data.family_id}}" },
-        { "user_condition": { "role": "admin" } }
-      ]
-    },
+    "create": { "user_condition": { "role": "admin" } },
+    "delete": { "user_condition": { "role": "admin" } },
     "read": {
       "$or": [
         { "data.family_id": "{{user.data.family_id}}" },
         { "user_condition": { "role": "admin" } }
       ]
     },
-    "update": {
-      "$or": [
-        { "data.family_id": "{{user.data.family_id}}" },
-        { "user_condition": { "role": "admin" } }
-      ]
-    }
+    "update": { "user_condition": { "role": "admin" } }
   },
   "type": "object"
 }
