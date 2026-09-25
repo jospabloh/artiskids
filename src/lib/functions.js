@@ -21,8 +21,11 @@ export async function callFunction(name, action, params = {}) {
     // every backend call, not just login. Callers branch on it: an
     // isRouterError message is safe to show inline, anything else needs
     // the support-escape-hatch treatment instead.
-    const routerMessage = err?.response?.data?.error;
+    // A 5xx is never a router rejection, even with an {error} body: its text
+    // is not something the user can act on.
+    const status = err?.response?.status;
+    const routerMessage = status && status < 500 ? err?.response?.data?.error : undefined;
     const message = routerMessage || err.message || "Algo salió mal";
-    throw Object.assign(new Error(message), { status: err?.response?.status, isRouterError: Boolean(routerMessage) });
+    throw Object.assign(new Error(message), { status, isRouterError: Boolean(routerMessage) });
   }
 }
