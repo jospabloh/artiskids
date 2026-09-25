@@ -38,6 +38,18 @@
       },
       "type": "string"
     },
+    "sessions_valid_after": {
+      "description": "Every login token issued before this instant is refused by every function router (_tokenCutoff.ts). Set by revokeSession and by Mission Control's sessions.revoke: Base44 can't revoke one token, so closing a device closes all of the user's sessions and each must log in again (security finding 2026-09-25). Write-locked, or a user could simply clear it.",
+      "format": "date-time",
+      "rls": {
+        "write": {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      },
+      "type": "string"
+    },
     "role": {
       "description": "The role of the user in the app",
       "enum": [

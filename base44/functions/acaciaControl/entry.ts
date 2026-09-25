@@ -26,6 +26,7 @@ const LICENSE_ENTITIES = new Set(["Family"]);
 const USAGE_ENTITIES = new Set(["Drawing", "Child", "Comment", "Reaction"]);
 const TICKET_ENTITY = "SupportTicket";
 const SESSION_ENTITY = "AppSession";
+const WRITE_ACTIONS = new Set(["license.set", "tickets.update", "sessions.revoke"]);
 
 function badRequest(message: string, status = 400): Response {
   return Response.json({ error: message }, { status });
@@ -56,6 +57,25 @@ export default async function (req: Request): Promise<Response> {
 
   const base44 = createClientFromRequest(req);
   const p = (params ?? {}) as Record<string, unknown>;
+
+  // A signature stays valid for the 5-minute clock window (_acaciaSign.ts, a
+  // byte-identical shared copy, so the check lives here). For actions that
+  // write, the same signature is accepted once: a replayed license.set could
+  // otherwise undo a newer one (security finding 2026-09-25). Reads stay
+  // replayable -- repeating one changes nothing.
+  if (WRITE_ACTIONS.has(action)) {
+    try {
+      const seen = await base44.asServiceRole.entities.BridgeNonce.filter({ sig });
+      if (seen.length > 0) return Response.json({ error: "replayed request" }, { status: 409 });
+      await base44.asServiceRole.entities.BridgeNonce.create({
+        sig,
+        expires_at: new Date(Number(ts) + 300_000).toISOString(),
+      });
+    } catch (e) {
+      console.error("acaciaControl nonce check failed:", e);
+      return Response.json({ error: "internal error" }, { status: 500 });
+    }
+  }
 
   try {
     switch (action) {
@@ -125,13 +145,24 @@ export default async function (req: Request): Promise<Response> {
         const ids = Array.isArray(p.ids) ? (p.ids as string[]) : [];
         const now = new Date().toISOString();
         const revoked: string[] = [];
+        const cutEmails = new Set<string>();
         for (const id of ids) {
+          const row = await base44.asServiceRole.entities[SESSION_ENTITY].get(id);
           await base44.asServiceRole.entities[SESSION_ENTITY].update(id, {
             status: "revoked",
             revoked_at: now,
             revoked_by: p.actorEmail ?? null,
           });
           revoked.push(id);
+          if (row?.user_email) cutEmails.add(String(row.user_email));
+        }
+        // Marking the row alone never ended the login (Base44 can't revoke a
+        // single token); the per-user cutoff does, in every router.
+        for (const email of cutEmails) {
+          const users = await base44.asServiceRole.entities.User.filter({ email });
+          for (const u of users) {
+            await base44.asServiceRole.entities.User.update(u.id, { sessions_valid_after: now });
+          }
         }
         return Response.json({ ok: true, revoked });
       }
