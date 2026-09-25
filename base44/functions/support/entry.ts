@@ -32,7 +32,9 @@ async function pushTicket(
   try {
     const master = secrets.get("INGEST_HMAC_SECRET");
     if (!master || !slug) return;
-    const url = secrets.get("ACACIA_MC_INGEST_URL") || "https://control.acaciaco.com.mx/api/ingest/ticket";
+    // Fixed destination, not a secret: an overridable URL is a way to send
+    // HMAC-signed ticket data somewhere else, and nothing ever set it.
+    const url = "https://control.acaciaco.com.mx/api/ingest/ticket";
     const ts = Date.now();
     const action = "ticket.ingest";
     const params = { app: slug, record: ticket };

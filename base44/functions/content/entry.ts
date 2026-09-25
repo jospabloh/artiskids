@@ -9,7 +9,7 @@
 // before a write, the two things RLS alone can't do here (Module 3).
 import { createClientFromRequest } from "npm:@base44/sdk";
 import { defaultAllowed } from "./_permissions.generated.ts";
-import { quotaBytesFor } from "./_storageQuota.ts";
+import { countBytesUpTo, quotaBytesFor } from "./_storageQuota.ts";
 
 const CATALOG_ENTITIES = new Set(["Child", "Parent", "Relative"]);
 const IMAGE_LINK_SECONDS = 3600;
@@ -91,17 +91,29 @@ export default async function (req: Request): Promise<Response> {
         // than accepted as a fallback: a public file is readable by anyone who
         // has its link, with no login, and these are children's drawings.
         const imageFileUri = String(p.image_file_uri ?? "").trim();
-        const fileSizeBytes = Number(p.file_size_bytes ?? 0);
         if (!title || !creatorName || !imageFileUri) {
           return badRequest("title, creator_name and image_file_uri are required");
-        }
-        if (!Number.isFinite(fileSizeBytes) || fileSizeBytes <= 0) {
-          return badRequest("file_size_bytes is required");
         }
 
         const family = await base44.asServiceRole.entities.Family.get(familyId);
         const used = Number(family.storage_used_bytes ?? 0);
         const quota = quotaBytesFor(family.billing_status as string | undefined);
+        // The size is measured from the stored file itself. The client still
+        // sends file_size_bytes, but it is ignored: a declared size let a
+        // family upload far past its quota by claiming 1 byte per file.
+        let fileSizeBytes: number;
+        try {
+          const { signed_url } = await base44.asServiceRole.integrations.Core.CreateFileSignedUrl({
+            file_uri: imageFileUri,
+            expires_in: 60,
+          });
+          const res = await fetch(signed_url, { signal: AbortSignal.timeout(20000) });
+          if (!res.ok || !res.body) throw new Error(`status ${res.status}`);
+          fileSizeBytes = await countBytesUpTo(res.body, Math.max(0, quota - used));
+        } catch {
+          return Response.json({ error: "no se pudo verificar el archivo subido" }, { status: 400 });
+        }
+        if (fileSizeBytes <= 0) return badRequest("el archivo subido está vacío");
         if (used + fileSizeBytes > quota) {
           return Response.json({ error: "storage quota exceeded" }, { status: 403 });
         }
