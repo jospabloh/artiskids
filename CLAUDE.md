@@ -822,6 +822,18 @@ rule, so it grants nothing). The family's admin sees the request in Mi cuenta;
   ever registered, only let someone redirect HMAC-signed payloads. The URLs
   are now constants.
 
+- **`createDrawing` signed any private `file_uri` (cross-family leak) —
+  closed only partially (2026-09-25).** The client sends the URI and
+  `imageUrls` signs it for the calling family. Two fixes are in: a URI
+  already used by any `Drawing` is refused (409), and `exportData` no longer
+  includes the raw `image_file_uri`. **Still open:** a URI that no live
+  `Drawing` uses — a *deleted* drawing's file (the SDK can't delete files)
+  or an unattached upload — can still be attached by whoever knows it. The
+  full fix is checking that the URI belongs to the caller; that depends on
+  the real `file_uri` format (the SDK's example is
+  `private/<userId>/…`, unverified: production has no private uploads yet).
+  Read one from the first real upload and close it.
+
 **Applying a schema when the Base44 MCP has no access.** On 2026-09-25
 `list_entity_schemas`/`update_entity_schema` answered "Unable to access this
 app" (while `query_entities` did work), and `execute_api` rejects the

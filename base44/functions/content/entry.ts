@@ -95,6 +95,17 @@ export default async function (req: Request): Promise<Response> {
           return badRequest("title, creator_name and image_file_uri are required");
         }
 
+        // A file_uri already on any Drawing, of any family, is never accepted
+        // again: otherwise someone who kept another family's URIs (an ex-member)
+        // could attach them here and have imageUrls sign those photos for them.
+        // A fresh upload always has a new URI, so this never blocks a real one.
+        // Partial: it can't tell who uploaded a URI no Drawing uses (security
+        // finding 2026-09-25; see CLAUDE.md).
+        const taken = await base44.asServiceRole.entities.Drawing.filter({ image_file_uri: imageFileUri });
+        if (taken.length > 0) {
+          return Response.json({ error: "ese archivo ya pertenece a otro dibujo" }, { status: 409 });
+        }
+
         const family = await base44.asServiceRole.entities.Family.get(familyId);
         const used = Number(family.storage_used_bytes ?? 0);
         const quota = quotaBytesFor(family.billing_status as string | undefined);
