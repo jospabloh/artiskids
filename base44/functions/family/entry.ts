@@ -375,6 +375,16 @@ export default async function (req: Request): Promise<Response> {
         // belongs to the caller's family, and that row is deleted just below.
         // A LEGACY public upload (image_url) stays reachable at its old link;
         // deleting the row cannot take that back.
+        // Their private URIs stay signable, though, so each one is retired
+        // first -- content's createDrawing refuses a retired URI, which is
+        // what stops an ex-member re-attaching these photos elsewhere.
+        const doomed = await base44.asServiceRole.entities.Drawing.filter({ family_id: familyId });
+        const uris = doomed
+          .map((d: Record<string, unknown>) => d.image_file_uri)
+          .filter((u: unknown): u is string => typeof u === "string" && u.length > 0);
+        if (uris.length > 0) {
+          await base44.asServiceRole.entities.RetiredFile.bulkCreate(uris.map((file_uri: string) => ({ file_uri })));
+        }
         await base44.asServiceRole.entities.Drawing.deleteMany({ family_id: familyId });
         await base44.asServiceRole.entities.Comment.deleteMany({ family_id: familyId });
         await base44.asServiceRole.entities.Reaction.deleteMany({ family_id: familyId });

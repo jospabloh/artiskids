@@ -823,16 +823,18 @@ rule, so it grants nothing). The family's admin sees the request in Mi cuenta;
   are now constants.
 
 - **`createDrawing` signed any private `file_uri` (cross-family leak) —
-  closed only partially (2026-09-25).** The client sends the URI and
-  `imageUrls` signs it for the calling family. Two fixes are in: a URI
-  already used by any `Drawing` is refused (409), and `exportData` no longer
-  includes the raw `image_file_uri`. **Still open:** a URI that no live
-  `Drawing` uses — a *deleted* drawing's file (the SDK can't delete files)
-  or an unattached upload — can still be attached by whoever knows it. The
-  full fix is checking that the URI belongs to the caller; that depends on
-  the real `file_uri` format (the SDK's example is
-  `private/<userId>/…`, unverified: production has no private uploads yet).
-  Read one from the first real upload and close it.
+  closed 2026-09-25 (PRs #23 and #24).** The client sends the URI and
+  `imageUrls` signs it for the calling family, so an ex-member who kept
+  URIs from their old family could re-attach them. `createDrawing` now
+  refuses (409) any URI a `Drawing` uses **or** that sits in `RetiredFile`, a
+  service-only entity where `deleteDrawing` and `deleteFamily` record every
+  URI before deleting the row (the SDK can't delete the file, so it stays
+  signable). `exportData` no longer exports the raw URI. The only URIs left
+  unrecorded are unattached uploads, and only their own uploader knows
+  those. No format assumption involved: production had no private uploads
+  yet, so there were no earlier deletions to backfill. **Deploy order:**
+  `RetiredFile` must exist before the functions that use it, or
+  `createDrawing` and the deletes answer 500.
 
 **Applying a schema when the Base44 MCP has no access.** On 2026-09-25
 `list_entity_schemas`/`update_entity_schema` answered "Unable to access this
