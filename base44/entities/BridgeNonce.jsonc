@@ -1,0 +1,22 @@
+{
+  "name": "BridgeNonce",
+  "properties": {
+    "sig": {
+      "description": "Signature of a write request acaciaControl already executed (license.set, tickets.update, sessions.revoke). The bridge accepts a signed request for 5 minutes, so without this a captured request could be replayed inside that window -- e.g. an old license.set undoing a newer one (security finding 2026-09-25). Service tier only.",
+      "type": "string"
+    },
+    "expires_at": {
+      "description": "When the signature's 5-minute window closes; after that the timestamp check alone refuses it, so the row is only kept for housekeeping.",
+      "format": "date-time",
+      "type": "string"
+    }
+  },
+  "required": ["sig"],
+  "rls": {
+    "create": { "user_condition": { "role": "admin" } },
+    "delete": { "user_condition": { "role": "admin" } },
+    "read": { "user_condition": { "role": "admin" } },
+    "update": { "user_condition": { "role": "admin" } }
+  },
+  "type": "object"
+}

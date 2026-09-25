@@ -836,12 +836,35 @@ rule, so it grants nothing). The family's admin sees the request in Mi cuenta;
   `RetiredFile` must exist before the functions that use it, or
   `createDrawing` and the deletes answer 500.
 
+- **"Cerrar sesión" didn't end any login.** It only marked the
+  `AppSession`; the Base44 token kept working in `content`/`family`/`support`,
+  and whoever held it simply registered as a new device. Base44 can't revoke
+  one token, so the revocation is **per user**: `User.sessions_valid_after`
+  (write-locked), and all four routers refuse a token whose JWT `iat` is
+  older (`_tokenCutoff.ts`, **identical copy** in each directory;
+  `tokenCutoff.test.ts` fails if they drift). `revokeSession` and the bridge's
+  `sessions.revoke` set it, so closing *one* device closes *all* of that
+  user's sessions, this one included — Mi cuenta warns before doing it, and
+  the client logs out on seeing `session revoked`. **Unverified:** that
+  Base44's JWT carries `iat` (production has never set a cutoff). If it
+  doesn't, the routers log `cutoff not enforced` and let the token through
+  (refusing would lock the user out, since a fresh login wouldn't carry it
+  either): the first real revoke has to confirm it in the function logs.
+- **The `acaciaControl` bridge accepted replays for 5 minutes.** For the
+  actions that write (`license.set`, `tickets.update`, `sessions.revoke`) a
+  signature is now accepted **once**: `BridgeNonce` (service-only) keeps the
+  ones already used. Reads stay replayable. The check lives in `entry.ts`,
+  not in `_acaciaSign.ts`, which is a byte-identical shared copy; the right
+  portfolio-wide fix (a nonce in the protocol) belongs in
+  `acacia-app-standard`. Nothing deletes old `BridgeNonce` rows yet — they
+  are a few per day.
+
 **Applying a schema when the Base44 MCP has no access.** On 2026-09-25
 `list_entity_schemas`/`update_entity_schema` answered "Unable to access this
 app" (while `query_entities` did work), and `execute_api` rejects the
 `entity-schemas` endpoints for the MCP token. The route that worked:
 `npx base44 entities push` from a checkout sitting at the head of
-`origin/main`. It pushes **all** entities (12 since `RetiredFile`) and replaces whatever is live
+`origin/main`. It pushes **all** entities (13 since `BridgeNonce`) and replaces whatever is live
 (deleting anything missing locally), so it is only safe when the repo already
 matches production. It reports every entity as "Updated" even when nothing
 changed, so that list proves nothing. The CLI can't read a schema back:

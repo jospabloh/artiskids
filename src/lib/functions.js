@@ -24,6 +24,12 @@ export async function callFunction(name, action, params = {}) {
     // A 5xx is never a router rejection, even with an {error} body: its text
     // is not something the user can act on.
     const status = err?.response?.status;
+    // The server refused a token issued before the user's session cutoff
+    // (someone closed their sessions). Only a fresh login fixes that, so end
+    // this one instead of retrying with a token that will never work again.
+    if (status === 401 && err?.response?.data?.error === "session revoked") {
+      base44.auth.logout();
+    }
     const routerMessage = status && status < 500 ? err?.response?.data?.error : undefined;
     const message = routerMessage || err.message || "Algo salió mal";
     throw Object.assign(new Error(message), { status, isRouterError: Boolean(routerMessage) });

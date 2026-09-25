@@ -5,6 +5,7 @@
 // shared/session/README.md for the full three-layer spec this implements
 // Layer 2 of; Layer 3 (the reap job) is base44/functions/purgeStaleSessions/.
 import { createClientFromRequest } from "npm:@base44/sdk";
+import { tokenCutoff } from "./_tokenCutoff.ts";
 import { isDead, isStale, retiredDeviceId, type SessionRow } from "./_sessionRules.ts";
 
 function badRequest(message: string, status = 400): Response {
@@ -49,6 +50,13 @@ export default async function (req: Request): Promise<Response> {
     return Response.json({ error: "not authenticated" }, { status: 401 });
   }
   if (!caller?.id) return Response.json({ error: "not authenticated" }, { status: 401 });
+
+  // A token issued before the user's sessions_valid_after was revoked by
+  // "cerrar sesión" (see _tokenCutoff.ts). Re-read, never trusted from the JWT.
+  const cutoffUser = await base44.asServiceRole.entities.User.get(caller.id);
+  const cut = tokenCutoff(req.headers.get("Authorization"), cutoffUser.sessions_valid_after);
+  if (cut === "revoked") return Response.json({ error: "session revoked" }, { status: 401 });
+  if (cut === "unknown") console.warn("session: sessions_valid_after set but the token has no iat; cutoff not enforced");
 
   let body: { action?: string; [key: string]: unknown };
   try {
@@ -207,12 +215,25 @@ export default async function (req: Request): Promise<Response> {
         if (!fresh.family_id || session.family_id !== fresh.family_id || session.user_email !== fresh.email) {
           return Response.json({ error: "not your session" }, { status: 403 });
         }
-        await base44.asServiceRole.entities.AppSession.update(sessionId, {
-          status: "revoked",
-          revoked_at: new Date().toISOString(),
-          revoked_by: fresh.email,
+        // Base44 can't revoke one device's token, so closing a device closes
+        // them all: every token issued before now stops working in every
+        // router (_tokenCutoff.ts), this one included. Each device, the
+        // revoked one too, must log in again; the UI says so before asking.
+        const now = new Date().toISOString();
+        await base44.asServiceRole.entities.User.update(fresh.id, { sessions_valid_after: now });
+        const mine = await base44.asServiceRole.entities.AppSession.filter({
+          family_id: fresh.family_id,
+          user_email: fresh.email,
         });
-        return Response.json({ ok: true });
+        for (const row of mine) {
+          if (row.status === "revoked") continue;
+          await base44.asServiceRole.entities.AppSession.update(row.id, {
+            status: "revoked",
+            revoked_at: now,
+            revoked_by: fresh.email,
+          });
+        }
+        return Response.json({ ok: true, signed_out_everywhere: true });
       }
 
       default:

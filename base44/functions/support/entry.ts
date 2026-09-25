@@ -3,6 +3,7 @@
 // on the sync alone leaves a customer who wrote at 09:00 waiting twenty-three
 // hours before support even knows (acacia-app-standard's STANDARD.md).
 import { createClientFromRequest } from "npm:@base44/sdk";
+import { tokenCutoff } from "./_tokenCutoff.ts";
 import { secrets } from "base44:runtime";
 import { signAs } from "./_acaciaSign.ts";
 
@@ -67,6 +68,13 @@ export default async function (req: Request): Promise<Response> {
     return Response.json({ error: "not authenticated" }, { status: 401 });
   }
   if (!caller?.id) return Response.json({ error: "not authenticated" }, { status: 401 });
+
+  // A token issued before the user's sessions_valid_after was revoked by
+  // "cerrar sesión" (see _tokenCutoff.ts). Re-read, never trusted from the JWT.
+  const cutoffUser = await base44.asServiceRole.entities.User.get(caller.id);
+  const cut = tokenCutoff(req.headers.get("Authorization"), cutoffUser.sessions_valid_after);
+  if (cut === "revoked") return Response.json({ error: "session revoked" }, { status: 401 });
+  if (cut === "unknown") console.warn("support: sessions_valid_after set but the token has no iat; cutoff not enforced");
 
   let body: { action?: string; [key: string]: unknown };
   try {

@@ -109,11 +109,15 @@ export default function Account() {
     });
   };
 
-  const revokeSession = (sessionId) =>
-    run(`session:${sessionId}`, async () => {
+  const revokeSession = (sessionId) => {
+    // The server can't end one device's login on its own, so this ends all
+    // of them -- this one included (see _tokenCutoff.ts).
+    if (!window.confirm("Por seguridad, esto cierra la sesión en todos tus dispositivos, incluido este. Tendrás que volver a entrar. ¿Continuar?")) return;
+    return run(`session:${sessionId}`, async () => {
       await callFunction("session", "revokeSession", { session_id: sessionId });
-      await load();
+      base44.auth.logout();
     });
+  };
 
   const exportData = () =>
     run("export", async () => {
