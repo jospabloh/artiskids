@@ -38,8 +38,9 @@ async function pingNewTenant(slug: string, familyId: string): Promise<void> {
   try {
     const master = secrets.get("INGEST_HMAC_SECRET");
     if (!master || !slug) return;
-    const url = secrets.get("MISSION_CONTROL_INGEST_URL") ||
-      "https://control.acaciaco.com.mx/api/ingest/tenant";
+    // Fixed destination, not a secret: an overridable URL is a way to send
+    // HMAC-signed tenant data somewhere else, and nothing ever set it.
+    const url = "https://control.acaciaco.com.mx/api/ingest/tenant";
     const ts = Date.now();
     const action = "tenant.created";
     const params = { app: slug, tenant_id: familyId };
