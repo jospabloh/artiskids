@@ -941,3 +941,53 @@ runtime can't `fetch` its own signed link and uploads are blocked.
 - [x] 21 About screen.
 - [x] 22 Server-authoritative diffing — `getFreshCaller` in every router.
 - [x] 23 Nav survives reload — route-derived, no collapsible state.
+
+## Verificación por código en Login y rol elegido al aprobar (2026-09-30)
+
+**Qué cambió**
+- `src/components/VerifyEmailStep.jsx` (nuevo): paso de código OTP compartido por
+  Register y Login (`verifyOtp({email, otpCode})`, `resendOtp`, errores en español,
+  enlace a WhatsApp). Tras verificar: si el SDK devuelve token lo guarda; si no,
+  hace `loginViaEmailPassword`; si eso falla, manda a `/login`. "Usar otro
+  correo" vuelve al formulario.
+- `src/lib/emailVerification.js`: `needsEmailVerification(err)` (regex sobre el
+  mensaje de Base44, como en stockflow). Login lo usa: si el login falla por
+  correo sin verificar, reenvía un código y abre el paso de código en vez de
+  mostrar el error crudo; los demás errores conservan su mensaje.
+- Register ya tenía pantalla de código; ahora usa el componente compartido (sin
+  duplicar).
+- `family/approveJoinRequest` acepta `role` y lo valida contra la lista blanca
+  `family/_assignableRoles.ts` (`family_admin`, `member`; nunca un rol de
+  plataforma). Sin `role` = `member` (clientes viejos en caché); un rol fuera de la
+  lista responde 400 antes de leer nada. Mi cuenta muestra un selector de rol por
+  solicitud. Prueba: `base44/functions/assignableRoles.test.ts` (5/5 con deno).
+
+**Ya cumplía (auditado, sin cambios)**
+- Crear familia: `createFamily` deja `family_admin`, tenant escrito por servidor
+  como servicio; `User.family_id/family_role` con `rls.write` solo admin.
+- Unirse con código: `redeemCode` solo escribe `pending_family_id` (no otorga
+  nada; ninguna RLS lo compara); la espera sobrevive a recargas
+  (`joinRequestStatus`); solo `approveJoinRequest` escribe `family_id/family_role`,
+  releyendo la fila almacenada del solicitante y comprobando que el que llama es
+  admin de ese tenant; `rejectJoinRequest` igual. `setMemberRole`/`delegateAdmin`
+  exigen que el objetivo ya esté en la familia. 409 si ya tiene familia se conserva.
+- No se encontró ruta que salte la aprobación.
+
+**Comprobaciones:** `npm run lint`, `build`, `validate:rls`, `validate:functions`
+en verde; `deno test` del test nuevo 5/5; `deno lint base44/functions` mantiene los
+15 avisos preexistentes (imports npm:/jsr: sin versión), ninguno nuevo;
+`typecheck` solo con los errores shadcn preexistentes.
+
+**NO verificado:** un registro/login real con correo sin verificar (el texto exacto
+del error de Base44 no se pudo comprobar, por eso el regex es amplio; si no
+coincide, el usuario ve el error crudo como antes); que `verifyOtp` devuelva o no
+token; el selector de rol contra la función publicada; `deno test` de las suites
+que importan de `jsr:` (bloqueado en el sandbox).
+
+**Desplegar (orden):** sin cambios de esquema. (1) Mergear a `main` (Base44
+sincroniza por GitHub; nunca `base44 deploy`). (2) Publicar. (3) Verificar por
+contenido: llamar `family` `approveJoinRequest` con `role:"admin"` sin sesión
+elevada da 401 en código nuevo o viejo, así que la prueba útil es un admin real
+aprobando con `role:"owner"`: debe dar 400 `invalid role` (código viejo lo
+aprobaría como member). Comprobar `git status` limpio y al día con `origin/main`
+antes de cualquier `functions deploy` manual.

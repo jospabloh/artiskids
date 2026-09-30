@@ -5,7 +5,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { callFunction } from "@/lib/functions";
 import { notifyMissionControl } from "@/lib/notifyMissionControl";
 import SupportEscapeHatch from "@/components/SupportEscapeHatch";
-import { FAMILY_ROLE_LABELS, isFamilyAdmin } from "@/lib/rbac";
+import { FAMILY_ROLES, FAMILY_ROLE_LABELS, isFamilyAdmin } from "@/lib/rbac";
 import { quotaBytesFor, formatBytes } from "@/lib/storageQuota";
 import { Users, UserPlus, Download, Smartphone, ShieldAlert, Loader2, Trash2 } from "lucide-react";
 
@@ -95,9 +95,13 @@ export default function Account() {
       await load();
     });
 
+  const [joinRoles, setJoinRoles] = useState({});
   const answerJoinRequest = (targetUserId, approve) =>
     run(`join:${targetUserId}`, async () => {
-      await callFunction("family", approve ? "approveJoinRequest" : "rejectJoinRequest", { target_user_id: targetUserId });
+      await callFunction("family", approve ? "approveJoinRequest" : "rejectJoinRequest", {
+        target_user_id: targetUserId,
+        ...(approve ? { role: joinRoles[targetUserId] || FAMILY_ROLES.MEMBER } : {}),
+      });
       await load();
     });
 
@@ -237,13 +241,25 @@ export default function Account() {
             <UserPlus className="w-4 h-4 text-amber-600" /> Solicitudes para unirse ({joinRequests.length})
           </h2>
           <p className="text-xs text-stone-500 mb-4">
-            Usaron el código de invitación. Aprueba solo a quien conozcas: verán todos los dibujos de la familia.
+            Usaron el código de invitación. Elige el rol y aprueba solo a quien conozcas: verán todos los dibujos de la familia.
           </p>
           <div className="space-y-2">
             {joinRequests.map((r) => (
               <div key={r.id} className="flex items-center justify-between gap-3 bg-white rounded-xl px-3 py-2.5">
                 <div className="min-w-0 text-sm font-medium text-stone-700 truncate">{r.email}</div>
                 <div className="flex items-center gap-1.5 shrink-0">
+                  <select
+                    aria-label={`Rol para ${r.email}`}
+                    value={joinRoles[r.id] || FAMILY_ROLES.MEMBER}
+                    onChange={(e) => setJoinRoles((prev) => ({ ...prev, [r.id]: e.target.value }))}
+                    className="text-xs rounded-full border border-stone-200 bg-white px-2 py-1.5 text-stone-600"
+                  >
+                    {Object.values(FAMILY_ROLES).map((role) => (
+                      <option key={role} value={role}>
+                        {FAMILY_ROLE_LABELS[role]}
+                      </option>
+                    ))}
+                  </select>
                   <button
                     onClick={() => answerJoinRequest(r.id, true)}
                     disabled={busy === `join:${r.id}`}

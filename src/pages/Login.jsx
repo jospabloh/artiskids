@@ -7,6 +7,9 @@ import { Label } from "@/components/ui/label";
 import { LogIn, Mail, Lock, Loader2, MessageCircle } from "lucide-react";
 import AuthLayout from "@/components/AuthLayout";
 import GoogleIcon from "@/components/GoogleIcon";
+import VerifyEmailStep from "@/components/VerifyEmailStep";
+import { needsEmailVerification } from "@/lib/emailVerification";
+import { toast } from "@/components/ui/use-toast";
 import { safeReturnTo } from "@/lib/authReturnTo";
 import { WHATSAPP_HREF } from "@/components/SupportEscapeHatch";
 
@@ -15,6 +18,7 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [verifying, setVerifying] = useState(false);
   // Post-login destination (e.g. the MCP OAuth consent page sends users here
   // with returnTo so the grant flow can resume). Same-origin paths only.
   const returnTo = safeReturnTo();
@@ -27,6 +31,17 @@ export default function Login() {
       await base44.auth.loginViaEmailPassword(email, password);
       window.location.href = returnTo;
     } catch (err) {
+      if (needsEmailVerification(err)) {
+        // Cuenta creada pero sin verificar: pedir el código en vez del error crudo.
+        try {
+          await base44.auth.resendOtp(email);
+        } catch {
+          /* el usuario puede pedir otro con "Reenviar código" */
+        }
+        toast({ title: "Falta verificar tu correo", description: "Escribe el código que te enviamos." });
+        setVerifying(true);
+        return;
+      }
       // err.message here comes from Base44's own auth API (not our
       // callFunction wrapper, so there's no isRouterError to branch on) --
       // usually a real, actionable message ("Invalid credentials"), but
@@ -41,6 +56,26 @@ export default function Login() {
   const handleGoogle = () => {
     base44.auth.loginWithProvider("google", returnTo);
   };
+
+  if (verifying) {
+    return (
+      <AuthLayout icon={Mail} title="Verifica tu correo" subtitle={`Enviamos un código a ${email}`}>
+        <VerifyEmailStep
+          email={email}
+          password={password}
+          onVerified={({ needsLogin }) => {
+            if (needsLogin) {
+              setVerifying(false);
+              setPassword("");
+            } else {
+              window.location.href = returnTo;
+            }
+          }}
+          onCancel={() => setVerifying(false)}
+        />
+      </AuthLayout>
+    );
+  }
 
   return (
     <AuthLayout
