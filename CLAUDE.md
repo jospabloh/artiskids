@@ -991,3 +991,13 @@ elevada da 401 en código nuevo o viejo, así que la prueba útil es un admin re
 aprobando con `role:"owner"`: debe dar 400 `invalid role` (código viejo lo
 aprobaría como member). Comprobar `git status` limpio y al día con `origin/main`
 antes de cualquier `functions deploy` manual.
+
+### Seguimiento de la revisión de Codex (2026-09-30)
+
+`Register.jsx`: al verificar el código sin sesión resultante (`needsLogin`), el envío
+a `/login` conserva ahora el `returnTo` ya validado por `safeReturnTo()` (mismo
+patrón del enlace "Inicia sesión" de la página), para que un flujo de consentimiento
+pueda retomarse. Sin cambios de función ni de esquema; esta app tiene sincronización
+con GitHub, así que no se ejecutó ningún `base44 deploy`. Verificado: `lint`, `build`,
+`validate:rls`, `validate:functions` y `deno test --allow-env --allow-read
+base44/functions/`. No verificado en navegador.

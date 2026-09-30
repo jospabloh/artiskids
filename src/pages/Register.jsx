@@ -73,7 +73,10 @@ export default function Register() {
           email={email}
           password={password}
           onVerified={({ needsLogin }) => {
-            window.location.href = needsLogin ? "/login" : safeReturnTo();
+            const dest = safeReturnTo();
+            window.location.href = needsLogin
+              ? "/login" + (dest !== "/" ? "?returnTo=" + encodeURIComponent(dest) : "")
+              : dest;
           }}
           onCancel={() => {
             setShowOtp(false);
