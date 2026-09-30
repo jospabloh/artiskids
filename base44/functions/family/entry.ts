@@ -11,6 +11,7 @@ import { tokenCutoff } from "./_tokenCutoff.ts";
 import { secrets } from "base44:runtime";
 import { signAs } from "./_acaciaSign.ts";
 import { defaultAllowed } from "./_permissions.generated.ts";
+import { resolveApprovedRole } from "./_assignableRoles.ts";
 
 const FAMILY_ADMIN = "family_admin";
 const MEMBER = "member";
@@ -240,6 +241,11 @@ export default async function (req: Request): Promise<Response> {
         const targetUserId = String(p.target_user_id ?? "");
         if (!targetUserId) return badRequest("target_user_id is required");
 
+        // The admin picks the role at approval time; validated against a
+        // whitelist (never a platform role). Checked before any read/write.
+        const approvedRole = action === "approveJoinRequest" ? resolveApprovedRole(p.role) : null;
+        if (action === "approveJoinRequest" && !approvedRole) return badRequest("invalid role");
+
         const fresh = await getFreshCaller(base44, caller.id);
         if (!fresh.family_id) return Response.json({ error: "not in a family" }, { status: 403 });
         if (!canManageFamily(fresh, "manage_members")) {
@@ -263,7 +269,7 @@ export default async function (req: Request): Promise<Response> {
         }
         await base44.asServiceRole.entities.User.update(targetUserId, {
           family_id: fresh.family_id,
-          family_role: MEMBER,
+          family_role: approvedRole,
           pending_family_id: null,
         });
         return Response.json({ ok: true });
