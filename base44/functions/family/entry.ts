@@ -158,11 +158,21 @@ export default async function (req: Request): Promise<Response> {
           created_by_email: fresh.email,
           join_code: generateJoinCode(),
         });
-        await base44.asServiceRole.entities.User.update(caller.id, {
-          family_id: family.id,
-          family_role: FAMILY_ADMIN,
-          pending_family_id: null,
-        });
+        try {
+          // tenant_id = copia en texto del id: la RLS de lectura de Family la
+          // compara con user.family_id (una regla sobre `id` no empareja al
+          // creador). Si algo falla, no dejamos una familia huérfana.
+          await base44.asServiceRole.entities.Family.update(family.id, { tenant_id: family.id });
+          await base44.asServiceRole.entities.User.update(caller.id, {
+            family_id: family.id,
+            family_role: FAMILY_ADMIN,
+            pending_family_id: null,
+          });
+        } catch (e) {
+          await base44.asServiceRole.entities.Family.delete(family.id).catch(() => null);
+          throw e;
+        }
+        family.tenant_id = family.id;
 
         const slug = secrets.get("ACACIA_APP_SLUG");
         if (slug) await pingNewTenant(slug, family.id);
