@@ -1001,3 +1001,26 @@ pueda retomarse. Sin cambios de función ni de esquema; esta app tiene sincroniz
 con GitHub, así que no se ejecutó ningún `base44 deploy`. Verificado: `lint`, `build`,
 `validate:rls`, `validate:functions` y `deno test --allow-env --allow-read
 base44/functions/`. No verificado en navegador.
+
+## Mi cuenta no cargaba para el dueño: `Family.tenant_id` (2026-10-01)
+
+**Causa:** la regla RLS de `Family` comparaba el `id` de la fila con
+`{{user.data.family_id}}`. Esa forma devuelve vacío/404 al propio creador (una regla
+`data.<campo>` contra la misma plantilla sí empareja). `/cuenta` hace
+`Family.get(user.family_id)`, fallaba, y ningún admin veía el código de unión ni
+podía aprobar/rechazar solicitudes ni cambiar roles desde la UI.
+
+**Arreglo:** campo `Family.tenant_id` (copia en texto del id de la fila) con candado
+`rls.write` solo `role: admin` (CRÍTICO: sin candado un miembro podría apuntarlo a
+otra familia y leerla). Las reglas read y update añaden
+`{"data.tenant_id": "{{user.data.family_id}}"}` dentro del mismo `$or`, conservando
+las ramas `id` y admin. `family/createFamily` fija `tenant_id = id` (service role) y
+si falla ese paso o el de `User` borra la familia recién creada. Relleno aditivo
+hecho con `tenant_id = id` en las familias existentes.
+
+**Regla:** cada cambio de RLS de un tenant se prueba leyéndolo como el dueño recién
+creado (cuenta nueva -> crear familia -> `GET entities/Family` con su token) y
+comprobando que otra familia NO puede leerlo.
+
+**Defecto 2 (login sin verificar):** el código ya estaba en main (#27) pero el sitio
+publicado seguía con el bundle anterior; se resolvió publicando (sync + deploy).
