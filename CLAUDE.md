@@ -900,6 +900,33 @@ The real proof of the quota fix is a real upload — **still pending as of
 this note**. If it fails with "no se pudo verificar el archivo subido", the
 runtime can't `fetch` its own signed link and uploads are blocked.
 
+## Revisión pre-lanzamiento (2026-10-02)
+
+Medido contra producción (Base44 MCP + GitHub Actions), no copiado de notas.
+
+**Cerrado con evidencia**
+- Smoke suite: 9 de 9 corridas programadas en verde (2026-09-24 → 2026-10-02).
+- Cuota por bytes reales: `storage_used_bytes` de "Mochi Family" = 7 335 213 =
+  4 272 415 + 3 062 798, la suma exacta de sus dos dibujos privados subidos
+  después del arreglo (2026-09-26 y 09-27). La subida real funciona.
+- Plan de pago: `recuerdos` existe en Mission Control y la página pública
+  muestra $129 MXN/mes, 5 GB (las notas anteriores que decían `plans: []`
+  están superadas).
+- `Family.tenant_id` está fijado en las 3 familias creadas desde el arreglo.
+- Hay 3 familias separadas con cuentas QA (admin + miembro en una), o sea que
+  el flujo crear/unir ya se ejercitó con cuentas reales distintas.
+
+**Sigue abierto (no se pudo verificar desde aquí)**
+- Lectura cruzada negada por RLS: requiere iniciar sesión como un miembro de la
+  familia A y pedir un id de la familia B. Sin token no se puede.
+- Revocación por `iat`: ningún `User` tiene `sessions_valid_after`; nunca se ha
+  ejercido en producción. El primer "Cerrar sesión" real debe revisarse en logs.
+- Job de reap: sesiones `passive` de más de 48 h siguen sin pasar a `revoked`
+  por el job; sólo la regla de 48 h dentro de `session` las rechaza.
+- El cobro por Mercado Pago de punta a punta (pagar → `active`) no está probado.
+- Una imagen legacy pública (`Drawing` 6ab302af…, familia Mochi) sigue
+  abierta sin login; el SDK no puede borrar el archivo. Hay que resubirla.
+
 ## ACACIA Portfolio Standard — status (audited 2026-09-23)
 
 `[x]` done and proven where proof is possible · `[~]` done with a named gap ·
