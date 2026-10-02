@@ -60,6 +60,17 @@ async function pingNewTenant(slug: string, familyId: string): Promise<void> {
 
 type Base44Client = ReturnType<typeof createClientFromRequest>;
 
+/** Success path for createFamily, shared by the normal return and the
+ *  P2-recovery branch below (the User.update landed server-side but its
+ *  HTTP response was lost/expired) -- mirrors tenant_id onto the in-memory
+ *  object and fires the best-effort Module 1 ping exactly once either way. */
+async function respondFamilyCreated(family: Record<string, unknown>): Promise<Response> {
+  family.tenant_id = family.id;
+  const slug = secrets.get("ACACIA_APP_SLUG");
+  if (slug) await pingNewTenant(slug, family.id as string);
+  return Response.json({ ok: true, family });
+}
+
 /** The caller's own User row, re-read as service role so family_id/
  *  family_role reflect the database, not the JWT the request walked in
  *  with. Every action starts here. */
@@ -169,15 +180,27 @@ export default async function (req: Request): Promise<Response> {
             pending_family_id: null,
           });
         } catch (e) {
+          // Hallazgo P2 de Codex (PR #28): este catch cubre tanto el
+          // Family.update de arriba como el User.update -- si el SEGUNDO ya
+          // se confirmó en el servidor pero su respuesta HTTP se
+          // perdió/expiró, el catch de todos modos se dispara. Borrar la
+          // familia en ese caso deja a este User con family_id apuntando a
+          // una fila inexistente: un reintento de createFamily ve
+          // fresh.family_id lleno y responde 409 "ya tienes una familia",
+          // sin ninguna salida posible desde /cuenta. Releer el User
+          // almacenado antes de compensar: si YA quedó enlazado a esta
+          // familia, el write sí tomó -- no hay nada que compensar, se
+          // responde éxito normal. Solo se borra la familia si el User
+          // realmente no quedó vinculado a ella.
+          const reread = await base44.asServiceRole.entities.User.get(caller.id).catch(() => null);
+          if (reread?.family_id === family.id) {
+            return await respondFamilyCreated(family);
+          }
           await base44.asServiceRole.entities.Family.delete(family.id).catch(() => null);
           throw e;
         }
-        family.tenant_id = family.id;
 
-        const slug = secrets.get("ACACIA_APP_SLUG");
-        if (slug) await pingNewTenant(slug, family.id);
-
-        return Response.json({ ok: true, family });
+        return await respondFamilyCreated(family);
       }
 
       case "listMembers": {
