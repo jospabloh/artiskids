@@ -916,16 +916,41 @@ Medido contra producción (Base44 MCP + GitHub Actions), no copiado de notas.
 - Hay 3 familias separadas con cuentas QA (admin + miembro en una), o sea que
   el flujo crear/unir ya se ejercitó con cuentas reales distintas.
 
-**Sigue abierto (no se pudo verificar desde aquí)**
-- Lectura cruzada negada por RLS: requiere iniciar sesión como un miembro de la
-  familia A y pedir un id de la familia B. Sin token no se puede.
-- Revocación por `iat`: ningún `User` tiene `sessions_valid_after`; nunca se ha
-  ejercido en producción. El primer "Cerrar sesión" real debe revisarse en logs.
-- Job de reap: sesiones `passive` de más de 48 h siguen sin pasar a `revoked`
-  por el job; sólo la regla de 48 h dentro de `session` las rechaza.
-- El cobro por Mercado Pago de punta a punta (pagar → `active`) no está probado.
-- Una imagen legacy pública (`Drawing` 6ab302af…, familia Mochi) sigue
-  abierta sin login; el SDK no puede borrar el archivo. Hay que resubirla.
+**Probado en producción el 2026-10-02 con 3 cuentas QA nuevas** (registro por
+API, código OTP leído del correo, 2 familias + 1 miembro; todo borrado al final
+con `deleteFamily` y `deleteMyAccount`):
+- **Aislamiento entre familias.** Con la sesión de B: `GET Drawing`/`Family` de A
+  → 404; listar `Drawing` → `[]`; `imageUrls` con id de A → `{}`; `PUT`/`DELETE`
+  de un dibujo de A → 403/404; `createComment`/`createReaction`/`deleteDrawing`
+  sobre un dibujo de A → 403 "not in your family"; `createDrawing` con el
+  `file_uri` de A → 409; `PUT User.family_id` propio → 403 (campo bloqueado);
+  `PUT Family.billing_status` propio → 403.
+- **Unirse con código.** `redeemCode` deja `pending`; antes de aprobar no ve
+  dibujos ni `imageUrls`; `approveJoinRequest` con `role: owner` o `admin` → 400
+  `invalid role` (el arreglo de #27 está vivo); con `member` → entra y ve los
+  dibujos; un miembro no puede promoverse, aprobar ni borrar la familia (403).
+- **Revocación por `iat`.** El JWT de Base44 **sí** lleva `iat`. Tras
+  `revokeSession`, el token viejo da `401 session revoked` en `family`, `content`
+  y `session`; otro usuario no se afecta; un login nuevo funciona.
+- **Zona de peligro.** `deleteFamily` borra familia y dibujos, deja `family_id`
+  en `null` en todos los usuarios (incluido el miembro) y registra el archivo en
+  `RetiredFile`; `deleteMyAccount` elimina al usuario.
+- Subida privada + `createDrawing` + `imageUrls` firmada: funcionan de punta a
+  punta con una cuenta recién creada.
+- Nota de método: desde el sandbox hay que enviar un `User-Agent` tipo curl; con
+  el de `urllib` Cloudflare responde 403 HTML antes de llegar al router.
+
+**Sigue abierto**
+- **Job de reap (`purgeStaleSessions`).** Las sesiones `passive` del dueño con
+  última actividad del 23 y 26 de septiembre siguen sin pasar a `revoked`: el job
+  no está reapeando. El endpoint `functions-mgmt/{name}/logs` responde `[]` hasta
+  para `session` (recién invocada), así que no distingue "no se invoca" de "el
+  guard lo rechaza". Mitigado: la regla de 48 h dentro de `session` rechaza esas
+  sesiones igual. Ver los logs en el panel de Base44.
+- **Cobro por Mercado Pago de punta a punta** (pagar → `active`): no probado, por
+  decisión del dueño de no hacer pagos de prueba.
+- **Imagen legacy pública** ("Día del padre", familia Mochi): sigue abierta sin
+  login; el SDK no puede borrar el archivo. Hay que resubirla desde la cuenta.
 
 ## ACACIA Portfolio Standard — status (audited 2026-09-23)
 
