@@ -900,6 +900,58 @@ The real proof of the quota fix is a real upload — **still pending as of
 this note**. If it fails with "no se pudo verificar el archivo subido", the
 runtime can't `fetch` its own signed link and uploads are blocked.
 
+## Revisión pre-lanzamiento (2026-10-02)
+
+Medido contra producción (Base44 MCP + GitHub Actions), no copiado de notas.
+
+**Cerrado con evidencia**
+- Smoke suite: 9 de 9 corridas programadas en verde (2026-09-24 → 2026-10-02).
+- Cuota por bytes reales: `storage_used_bytes` de "Mochi Family" = 7 335 213 =
+  4 272 415 + 3 062 798, la suma exacta de sus dos dibujos privados subidos
+  después del arreglo (2026-09-26 y 09-27). La subida real funciona.
+- Plan de pago: `recuerdos` existe en Mission Control y la página pública
+  muestra $129 MXN/mes, 5 GB (las notas anteriores que decían `plans: []`
+  están superadas).
+- `Family.tenant_id` está fijado en las 3 familias creadas desde el arreglo.
+- Hay 3 familias separadas con cuentas QA (admin + miembro en una), o sea que
+  el flujo crear/unir ya se ejercitó con cuentas reales distintas.
+
+**Probado en producción el 2026-10-02 con 3 cuentas QA nuevas** (registro por
+API, código OTP leído del correo, 2 familias + 1 miembro; todo borrado al final
+con `deleteFamily` y `deleteMyAccount`):
+- **Aislamiento entre familias.** Con la sesión de B: `GET Drawing`/`Family` de A
+  → 404; listar `Drawing` → `[]`; `imageUrls` con id de A → `{}`; `PUT`/`DELETE`
+  de un dibujo de A → 403/404; `createComment`/`createReaction`/`deleteDrawing`
+  sobre un dibujo de A → 403 "not in your family"; `createDrawing` con el
+  `file_uri` de A → 409; `PUT User.family_id` propio → 403 (campo bloqueado);
+  `PUT Family.billing_status` propio → 403.
+- **Unirse con código.** `redeemCode` deja `pending`; antes de aprobar no ve
+  dibujos ni `imageUrls`; `approveJoinRequest` con `role: owner` o `admin` → 400
+  `invalid role` (el arreglo de #27 está vivo); con `member` → entra y ve los
+  dibujos; un miembro no puede promoverse, aprobar ni borrar la familia (403).
+- **Revocación por `iat`.** El JWT de Base44 **sí** lleva `iat`. Tras
+  `revokeSession`, el token viejo da `401 session revoked` en `family`, `content`
+  y `session`; otro usuario no se afecta; un login nuevo funciona.
+- **Zona de peligro.** `deleteFamily` borra familia y dibujos, deja `family_id`
+  en `null` en todos los usuarios (incluido el miembro) y registra el archivo en
+  `RetiredFile`; `deleteMyAccount` elimina al usuario.
+- Subida privada + `createDrawing` + `imageUrls` firmada: funcionan de punta a
+  punta con una cuenta recién creada.
+- Nota de método: desde el sandbox hay que enviar un `User-Agent` tipo curl; con
+  el de `urllib` Cloudflare responde 403 HTML antes de llegar al router.
+
+**Sigue abierto**
+- **Job de reap (`purgeStaleSessions`).** Las sesiones `passive` del dueño con
+  última actividad del 23 y 26 de septiembre siguen sin pasar a `revoked`: el job
+  no está reapeando. El endpoint `functions-mgmt/{name}/logs` responde `[]` hasta
+  para `session` (recién invocada), así que no distingue "no se invoca" de "el
+  guard lo rechaza". Mitigado: la regla de 48 h dentro de `session` rechaza esas
+  sesiones igual. Ver los logs en el panel de Base44.
+- **Cobro por Mercado Pago de punta a punta** (pagar → `active`): no probado, por
+  decisión del dueño de no hacer pagos de prueba.
+- **Imagen legacy pública** ("Día del padre", familia Mochi): sigue abierta sin
+  login; el SDK no puede borrar el archivo. Hay que resubirla desde la cuenta.
+
 ## ACACIA Portfolio Standard — status (audited 2026-09-23)
 
 `[x]` done and proven where proof is possible · `[~]` done with a named gap ·
