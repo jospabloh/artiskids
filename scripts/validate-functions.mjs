@@ -29,6 +29,31 @@ for (const entry of entries) {
   console.log(`  - ${entry.name}`);
 }
 
+// Base44's function schema only knows name/entry/automations; any other
+// top-level key is dropped silently, so a schedule written loose at the top
+// level deploys a function that never runs (purgeStaleSessions, 2026-10).
+const misplaced = ["type", "schedule_mode", "schedule_type", "cron_expression"];
+let badConfig = false;
+for (const entry of entries) {
+  const cfgPath = path.join(functionsDir, entry.name, "function.jsonc");
+  if (!existsSync(cfgPath)) continue;
+  const text = readFileSync(cfgPath, "utf8").replace(/^\s*\/\/.*$/gm, "");
+  let cfg;
+  try {
+    cfg = JSON.parse(text);
+  } catch (err) {
+    console.error(`${entry.name}/function.jsonc is not valid JSONC: ${err.message}`);
+    badConfig = true;
+    continue;
+  }
+  const loose = misplaced.filter((k) => k in cfg);
+  if (loose.length > 0) {
+    console.error(`${entry.name}/function.jsonc has ${loose.join(", ")} at the top level; Base44 ignores them. Move the schedule inside "automations": [...].`);
+    badConfig = true;
+  }
+}
+if (badConfig) process.exit(1);
+
 if (entries.length > maxFunctions) {
   console.error(`\nOver budget: ${entries.length} > ${maxFunctions}. Consolidate before deploying.`);
   process.exit(1);
