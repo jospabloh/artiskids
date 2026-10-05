@@ -1,9 +1,20 @@
 {
   "name": "purgeStaleSessions",
   "entry": "entry.ts",
+  // The schedule MUST live inside `automations`. The CLI's function schema
+  // only knows name/entry/automations and silently drops anything else at the
+  // top level, so this job was never scheduled before (it had type/
+  // schedule_mode/cron_expression loose at the top). scripts/validate-
+  // functions.mjs now fails on that shape.
   // Hourly is plenty against a 48h threshold -- reaping late by under an
   // hour doesn't matter at that scale, and this keeps the job cheap.
-  "type": "scheduled",
-  "schedule_mode": "recurring",
-  "cron_expression": "0 * * * *"
+  "automations": [
+    {
+      "type": "scheduled",
+      "name": "purge-stale-sessions-hourly",
+      "schedule_mode": "recurring",
+      "schedule_type": "cron",
+      "cron_expression": "0 * * * *"
+    }
+  ]
 }
