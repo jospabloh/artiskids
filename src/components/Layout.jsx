@@ -23,12 +23,12 @@ export default function Layout() {
             <img src="/logo.jpg" alt="ArtisKids" className="w-9 h-9 rounded-xl object-cover shadow-sm shrink-0" />
             <div className="leading-tight min-w-0">
               <div className="font-heading font-bold text-stone-800 truncate">Cápsula de Arte</div>
-              <div className="hidden sm:block text-[11px] text-stone-400 -mt-0.5">Recuerdos que duran para siempre</div>
+              <div className="hidden lg:block text-[11px] text-stone-400 -mt-0.5">Recuerdos que duran para siempre</div>
             </div>
           </Link>
-          {/* Full pill nav has room for icon+label only from sm up -- below
+          {/* Full pill nav has room for icon+label only from lg (1024) up -- below
               that it moves to the fixed bottom tab bar (see nav below main). */}
-          <nav className="hidden sm:flex items-center gap-1">
+          <nav className="hidden lg:flex items-center gap-1">
             {navItems.map((item) => {
               const active = location.pathname === item.to;
               const Icon = item.icon;
@@ -36,13 +36,13 @@ export default function Layout() {
                 <Link
                   key={item.to}
                   to={item.to}
-                  className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-medium transition ${
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-medium whitespace-nowrap transition ${
                     active
                       ? "bg-amber-100 text-amber-700"
                       : "text-stone-500 hover:bg-stone-100"
                   }`}
                 >
-                  <Icon className="w-4 h-4" />
+                  <Icon className="w-4 h-4 shrink-0" />
                   <span>{item.label}</span>
                 </Link>
               );
@@ -58,7 +58,7 @@ export default function Layout() {
           <button
             onClick={() => logout()}
             title="Cerrar sesión"
-            className="sm:hidden shrink-0 p-2 -mr-2 rounded-full text-stone-400 active:bg-stone-100 active:text-rose-500 transition"
+            className="lg:hidden shrink-0 p-2 -mr-2 rounded-full text-stone-400 active:bg-stone-100 active:text-rose-500 transition"
           >
             <LogOut className="w-5 h-5" />
           </button>
@@ -70,7 +70,7 @@ export default function Layout() {
       {/* The tab-bar clearance lives here, not on <main>: the footer is the
           last thing in the flow, so padding on <main> left its links under
           the fixed bar on phones. */}
-      <footer className="text-center text-xs text-stone-400 pt-6 pb-24 sm:pb-6">
+      <footer className="text-center text-xs text-stone-400 pt-6 pb-24 lg:pb-6">
         Hecho con cariño para las familias · Cápsula de Arte
         <div className="mt-1 text-stone-400">Hecho por <span className="font-semibold text-stone-500">Acacia Consultoría</span></div>
         <div className="mt-2 flex items-center justify-center gap-3">
@@ -82,7 +82,7 @@ export default function Layout() {
       {/* Mobile-only bottom tab bar -- thumb-reach primary nav, icon above
           label, safe-area padding for the iPhone home-indicator strip. */}
       <nav
-        className="sm:hidden fixed bottom-0 inset-x-0 z-30 bg-white/95 backdrop-blur border-t border-amber-100"
+        className="lg:hidden fixed bottom-0 inset-x-0 z-30 bg-white/95 backdrop-blur border-t border-amber-100"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
         <div className="grid grid-cols-5">
