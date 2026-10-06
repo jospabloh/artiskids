@@ -26,12 +26,12 @@ export default function DrawingCard({ drawing, imageUrl }) {
         <div className="flex items-start justify-between gap-2">
           <h3 className="font-heading font-semibold text-stone-800 leading-tight">{drawing.title}</h3>
           {drawing.album && (
-            <span className="shrink-0 text-[11px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-600 border border-amber-100">
+            <span title={drawing.album} className="min-w-0 max-w-[50%] truncate text-[11px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-600 border border-amber-100">
               {drawing.album}
             </span>
           )}
         </div>
-        <div className="mt-2 flex items-center gap-2 text-sm text-stone-500">
+        <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-stone-500">
           <span className="w-6 h-6 rounded-full bg-gradient-to-br from-rose-300 to-amber-300 flex items-center justify-center text-[11px] font-bold text-white">
             {(drawing.creator_name || "?").charAt(0).toUpperCase()}
           </span>

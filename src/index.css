@@ -88,9 +88,9 @@
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
 
-  /* 639px = Tailwind's `sm` minus one, the width the bottom tab bar shows at
-     (`sm:hidden` in Layout.jsx). 4.5rem = the bar's ~56px plus a 16px gap. */
-  @media (max-width: 639px) {
+  /* 1023px = Tailwind's `lg` minus one, the width the bottom tab bar shows at
+     (`lg:hidden` in Layout.jsx). 4.5rem = the bar's ~56px plus a 16px gap. */
+  @media (max-width: 1023px) {
     :root {
       --theme-switcher-bottom: 4.5rem;
     }
