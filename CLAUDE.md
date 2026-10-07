@@ -1076,3 +1076,18 @@ comprobando que otra familia NO puede leerlo.
 
 **Defecto 2 (login sin verificar):** el código ya estaba en main (#27) pero el sitio
 publicado seguía con el bundle anterior; se resolvió publicando (sync + deploy).
+
+## `createFamily` ya no borra la familia si el `User.update` sí tomó (2026-10-02, PR #29)
+
+Hallazgo P2 de Codex sobre el PR #28: el `catch` de `createFamily` cubría tanto
+`Family.update(tenant_id)` como `User.update(family_id)`. Si el segundo se
+confirmaba pero su respuesta HTTP se perdía, el `catch` borraba la familia y
+dejaba `User.family_id` apuntando a una fila inexistente (reintento → 409, sin
+salida desde `/cuenta`). Ahora el `catch` relee el `User` como servicio y solo
+compensa si de verdad no quedó vinculado; si sí, responde éxito con el mismo
+helper `respondFamilyCreated` del camino normal.
+
+**Desplegado:** sync + `coding/redeploy-function/family`, verificado por
+contenido en el sandbox. **Verificado en vivo** con una cuenta QA nueva:
+crear familia → 200, reintento → 409. **No verificado:** la pérdida real de la
+respuesta HTTP (no se puede provocar desde aquí); cubierto por lectura de código.
