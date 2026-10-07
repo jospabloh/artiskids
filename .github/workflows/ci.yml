@@ -1,0 +1,37 @@
+name: CI
+
+# The repo's own fast checks, on every PR and every push to main (Module 4:
+# validate:rls existed but nothing ran it). Each step is something a
+# contributor already runs locally; CI only makes skipping them impossible.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run validate:rls
+      - run: npm run validate:functions
+      # The four routers' _permissions.generated.ts must match the registry.
+      # Regenerating must be a no-op; a diff means someone hand-edited a copy
+      # or changed the registry without regenerating.
+      - name: Permission manifests are up to date
+        run: |
+          npm run generate:permissions
+          git diff --exit-code -- base44/functions
+      - run: npm run build
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      # --allow-read: some tests assert that copied files stay identical to
+      # their sources (src/lib/rbac.js, the four _tokenCutoff.ts copies).
+      - run: deno test --allow-read base44/functions/

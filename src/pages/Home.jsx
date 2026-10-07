@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from "react";
 import { base44 } from "@/api/base44Client";
 import DrawingCard from "@/components/DrawingCard";
 import { useDrawingImages } from "@/lib/useDrawingImages";
+import { usePermissions } from "@/lib/usePermissions";
 import { Image } from "@/components/ui/image";
 import { Link } from "react-router-dom";
 import { format, parseISO, isSameDay } from "date-fns";
@@ -13,6 +14,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [albumFilter, setAlbumFilter] = useState("Todos");
   const imageUrls = useDrawingImages(drawings);
+  const { can } = usePermissions();
 
   useEffect(() => {
     base44.entities.Drawing.list("-drawn_date", 200)
@@ -80,12 +82,14 @@ export default function Home() {
       <section>
         <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
           <h2 className="font-heading font-bold text-lg text-stone-800">Línea de tiempo</h2>
-          <Link
-            to="/subir"
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-stone-800 text-white text-sm font-medium hover:bg-stone-900 transition"
-          >
-            <Upload className="w-4 h-4" /> Subir dibujo
-          </Link>
+          {can("Dibujos", "upload") && (
+            <Link
+              to="/subir"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-stone-800 text-white text-sm font-medium hover:bg-stone-900 transition"
+            >
+              <Upload className="w-4 h-4" /> Subir dibujo
+            </Link>
+          )}
         </div>
 
         {/* Filtros de álbum */}

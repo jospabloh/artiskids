@@ -1,9 +1,12 @@
 import { useEffect, useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { callFunction } from "@/lib/functions";
+import { usePermissions } from "@/lib/usePermissions";
 import { Plus, Trash2 } from "lucide-react";
 
 export default function CatalogList({ entityName, label, fields, accent = "amber" }) {
+  const { can } = usePermissions();
+  const canManage = can("Catalogo", "manage");
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState(() => Object.fromEntries(fields.map((f) => [f.key, ""])));
@@ -39,6 +42,7 @@ export default function CatalogList({ entityName, label, fields, accent = "amber
 
   return (
     <div>
+      {canManage && (
       <form onSubmit={add} className="flex flex-wrap gap-2 mb-4">
         {fields.map((f) => (
           <input
@@ -54,6 +58,7 @@ export default function CatalogList({ entityName, label, fields, accent = "amber
           <Plus className="w-4 h-4" /> Agregar
         </button>
       </form>
+      )}
 
       {loading ? (
         <div className="text-sm text-stone-400">Cargando...</div>
@@ -72,9 +77,11 @@ export default function CatalogList({ entityName, label, fields, accent = "amber
                   <div key={f.key} className="text-xs text-stone-400 truncate">{f.label}: {item[f.key]}</div>
                 ))}
               </div>
-              <button onClick={() => remove(item.id)} className="text-stone-300 hover:text-rose-500 transition p-1">
-                <Trash2 className="w-4 h-4" />
-              </button>
+              {canManage && (
+                <button onClick={() => remove(item.id)} className="text-stone-300 hover:text-rose-500 transition p-1">
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              )}
             </div>
           ))}
         </div>
