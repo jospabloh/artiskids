@@ -5,6 +5,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { callFunction } from "@/lib/functions";
 import { notifyMissionControl } from "@/lib/notifyMissionControl";
 import SupportEscapeHatch from "@/components/SupportEscapeHatch";
+import TypedConfirmDialog from "@/components/TypedConfirmDialog";
 import { FAMILY_ROLES, FAMILY_ROLE_LABELS, isFamilyAdmin } from "@/lib/rbac";
 import { quotaBytesFor, formatBytes } from "@/lib/storageQuota";
 import { Users, UserPlus, Download, Smartphone, ShieldAlert, Loader2, Trash2 } from "lucide-react";
@@ -71,6 +72,7 @@ export default function Account() {
     setBusy(key);
     try {
       await action();
+      return true;
     } catch (err) {
       if (err.isRouterError) {
         setError(err.message);
@@ -81,6 +83,7 @@ export default function Account() {
     } finally {
       setBusy("");
     }
+    return false;
   };
 
   const changeRole = (targetUserId, newRole) =>
@@ -89,11 +92,16 @@ export default function Account() {
       await load();
     });
 
-  const delegate = (targetUserId) =>
-    run(`delegate:${targetUserId}`, async () => {
+  const delegate = (targetUserId) => {
+    // Module 7: promoting is its own confirmed step, and says plainly that
+    // the person promoting keeps their own admin role.
+    const target = members.find((m) => m.id === targetUserId);
+    if (!confirm(`${target?.email || "Este miembro"} también será administrador de la familia y podrá gestionar miembros y eliminarla. Tú sigues siendo administrador. ¿Continuar?`)) return;
+    return run(`delegate:${targetUserId}`, async () => {
       await callFunction("family", "delegateAdmin", { target_user_id: targetUserId });
       await load();
     });
+  };
 
   const [joinRoles, setJoinRoles] = useState({});
   const answerJoinRequest = (targetUserId, approve) =>
@@ -135,23 +143,22 @@ export default function Account() {
       URL.revokeObjectURL(url);
     });
 
-  const deleteMyAccount = () => {
-    if (!confirm("¿Eliminar tu cuenta? Esta acción no se puede deshacer.")) return;
+  // Which irreversible action is waiting on its typed confirmation, if any.
+  const [pendingDelete, setPendingDelete] = useState(null); // null | "account" | "family"
+
+  const deleteMyAccount = () =>
     run("deleteMyAccount", async () => {
       await callFunction("family", "deleteMyAccount");
       logout(false);
       navigate("/login", { replace: true });
     });
-  };
 
-  const deleteFamily = () => {
-    if (!confirm(`¿Eliminar la familia "${family?.name}" por completo? Se borran todos los dibujos, comentarios y reacciones. Esta acción no se puede deshacer.`)) return;
+  const deleteFamily = () =>
     run("deleteFamily", async () => {
       await callFunction("family", "deleteFamily");
       await checkUserAuth();
       navigate("/bienvenida", { replace: true });
     });
-  };
 
   if (loading) {
     return <div className="flex justify-center py-20"><div className="w-8 h-8 border-4 border-amber-200 border-t-amber-500 rounded-full animate-spin" /></div>;
@@ -378,7 +385,7 @@ export default function Account() {
             </p>
           )}
           <button
-            onClick={deleteMyAccount}
+            onClick={() => setPendingDelete("account")}
             disabled={busy === "deleteMyAccount" || (admin && soleAdmin)}
             className="w-full text-sm px-4 py-2.5 rounded-xl border border-rose-200 text-rose-600 font-medium hover:bg-rose-100 disabled:opacity-50 transition"
           >
@@ -386,7 +393,7 @@ export default function Account() {
           </button>
           {admin && (
             <button
-              onClick={deleteFamily}
+              onClick={() => setPendingDelete("family")}
               disabled={busy === "deleteFamily"}
               className="w-full text-sm px-4 py-2.5 rounded-xl bg-rose-600 text-white font-medium hover:bg-rose-700 disabled:opacity-50 transition"
             >
@@ -395,6 +402,35 @@ export default function Account() {
           )}
         </div>
       </section>
+
+      <TypedConfirmDialog
+        open={pendingDelete === "account"}
+        title="Eliminar tu cuenta"
+        description="Se elimina tu cuenta: sales de la familia y se borran tus comentarios y reacciones. Los dibujos que subiste se quedan en la familia. Esta acción no se puede deshacer."
+        phrase="ELIMINAR"
+        confirmLabel="Eliminar mi cuenta"
+        busy={busy === "deleteMyAccount"}
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={async () => {
+          // On failure the dialog closes too, so the error shown at the top
+          // of the page isn't hidden behind it; scroll there.
+          if (!(await deleteMyAccount())) window.scrollTo({ top: 0, behavior: "smooth" });
+          setPendingDelete(null);
+        }}
+      />
+      <TypedConfirmDialog
+        open={pendingDelete === "family"}
+        title="Eliminar la familia completa"
+        description="Se borran todos los dibujos, comentarios y reacciones, y todos los miembros pierden el acceso. Esta acción no se puede deshacer."
+        phrase={family?.name || "ELIMINAR"}
+        confirmLabel="Eliminar la familia"
+        busy={busy === "deleteFamily"}
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={async () => {
+          if (!(await deleteFamily())) window.scrollTo({ top: 0, behavior: "smooth" });
+          setPendingDelete(null);
+        }}
+      />
     </div>
   );
 }

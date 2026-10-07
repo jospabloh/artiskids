@@ -952,47 +952,114 @@ con `deleteFamily` y `deleteMyAccount`):
 - **Imagen legacy pública** ("Día del padre", familia Mochi): sigue abierta sin
   login; el SDK no puede borrar el archivo. Hay que resubirla desde la cuenta.
 
-## ACACIA Portfolio Standard — status (audited 2026-09-23)
+## ACACIA Portfolio Standard — status (revisado 2026-10-07)
 
-`[x]` done and proven where proof is possible · `[~]` done with a named gap ·
-`[ ]` open. Full text of each module: `acacia-app-standard/CHECKLIST.md`.
+`[x]` hecho y probado donde se puede probar · `[~]` hecho con una brecha
+nombrada · `[ ]` abierto. Texto completo de cada módulo:
+`acacia-app-standard/CHECKLIST.md`.
 
-- [x] 1 License lifecycle — `billing_status` write-locked; 30-day trial set
-      server-side; Mission Control's unified cron now covers the app
-      (registered, synced). New-tenant ping fires; MC has no receiver yet.
-- [x] 2 Roles — two roles, one gated code path, zero-admin guard; invite
-      code is request-then-approve (PR #17, live since 2026-09-23 — the served
-      bundle carries "Solicitudes para unirse"). Not yet exercised with a
-      second real account.
-- [~] 3 Permissions — one registry, server re-check on every write, billing
-      gate. **Gap: Permisos is a read-only view**, not the editable matrix.
-- [~] 4 RLS — four-op `$or` everywhere, deployed = repo. `validate:rls`
-      exists but no CI workflow runs it.
-- [x] 5 Health — `acaciaControl` ping; `app_health` `ok` 383 ms (2026-09-23).
-- [x] 6 Changelog — `APP_VERSION`/changelog via `scripts/release.mjs`.
-- [~] 7 Account & danger zone — both delete scopes, delegate, export.
-      Confirmation is the browser's `confirm()`, not a typed confirmation.
-- [x] 8 Support — `SupportTicket` + real-time push to Mission Control.
+- [x] 1 License lifecycle — `billing_status` write-locked; prueba de 30 días
+      fijada en servidor; el cron unificado de Mission Control cubre la app.
+      Plan `recuerdos` ($129 MXN/mes, 5 GB) existe. Cobro MP de punta a punta
+      sin probar, por decisión del dueño (sin pagos de prueba).
+- [x] 2 Roles — dos roles, guardia de cero admins, código de unión es
+      solicitud-y-aprobación; probado en producción con cuentas QA (2026-10-02).
+- [x] 3 Permissions — registro único, re-chequeo en servidor en cada escritura,
+      compuerta de billing, **y desde 2026-10-07 la matriz de Permisos es
+      editable** (ver "Cierre de brechas" abajo). `can()` oculta en la UI lo
+      que el rol no puede hacer.
+- [x] 4 RLS — `$or` de cuatro operaciones en todo, desplegado = repo.
+      `validate:rls` corre en CI (`.github/workflows/ci.yml`) desde 2026-10-07.
+- [x] 5 Health — ping de `acaciaControl`; `app_health` `ok`.
+- [x] 6 Changelog — `APP_VERSION`/changelog vía `scripts/release.mjs`.
+- [x] 7 Account & danger zone — borrar cuenta y borrar familia piden
+      **confirmación escrita** (nombre de la familia / `ELIMINAR`) desde
+      2026-10-07; promover a admin tiene su propio paso de confirmación.
+- [x] 8 Support — `SupportTicket` + push en tiempo real a Mission Control.
 - [x] 9 acaciaco-site page — `apps/artiskids.html`.
-- [x] 10 Login — split-screen, Spanish, Google live, no hosted-login redirect.
-- [x] 11 Deploy discipline — adapted to GitHub sync (see Frozen decisions).
-- [x] 12 Theme — shared switcher; mobile tab-bar collision fixed (PR #17).
-- [~] 13 Smoke test — suite + workflow added (PR #17); first CI run pending.
-- [x] 14 Isolation audit — above, 2026-09-23, with its could-not-verify list.
-- [x] 15 Bridge — derived key, `ACCEPT_LEGACY_MASTER = false`, proven by sync.
-- [~] 16 Secrets — `ACACIA_APP_SLUG` and `INGEST_HMAC_SECRET` proven by a
-      successful sync; `CRON_SECRET` unproven (the reap job never ran, see
-      Module 20); `PLATFORM_OWNER_EMAIL` unproven.
-- [x] 17 Mission Control side — row, adapter, config entries, sync proven.
-- [x] 18 Retired — one account, one family; 409 on a second.
+- [x] 10 Login — pantalla dividida, español, Google, OTP por correo.
+- [x] 11 Deploy discipline — adaptado al GitHub sync (ver Frozen decisions).
+- [x] 12 Theme — selector compartido; tablet/móvil sin traslapes (PR #32).
+- [x] 13 Smoke test — 13 de 13 corridas programadas en verde
+      (2026-09-24 → 2026-10-06).
+- [x] 14 Isolation audit — 2026-09-23, re-probado contra producción con
+      cuentas QA el 2026-10-02.
+- [x] 15 Bridge — llave derivada, `ACCEPT_LEGACY_MASTER = false`, probado.
+- [~] 16 Secrets — `ACACIA_APP_SLUG` e `INGEST_HMAC_SECRET` probados por sync.
+      `CRON_SECRET`: el valor da igual mientras el programador de Base44 no lo
+      mande (ver módulo 20). `PLATFORM_OWNER_EMAIL` solo se usa en
+      `deleteMyAccount`; sin probar.
+- [x] 17 Mission Control side — fila, adaptador, configuración, sync probado.
+- [x] 18 Retired — una cuenta, una familia; 409 a una segunda.
 - [x] 19 Locks state their rationale in their own field descriptions.
-- [~] 20 Session control — idle warning, device list, revoke, and the 48h
-      rule now enforced inside `session` itself (see "Session reap probe").
-      Gaps: the scheduled reap job has not been seen to run; the shared
-      expired-session dialog's re-login button doesn't end the Base44 login.
+- [~] 20 Session control — aviso de inactividad, lista de dispositivos,
+      revocación por `iat`, y la regla de 48 h dentro de `session` **probada en
+      producción** (3 filas `revoked_by: system` con `device_id` retirado).
+      **Brecha: el job horario `purgeStaleSessions` nunca ha limpiado nada** —
+      ver "Cierre de brechas".
 - [x] 21 About screen.
-- [x] 22 Server-authoritative diffing — `getFreshCaller` in every router.
-- [x] 23 Nav survives reload — route-derived, no collapsible state.
+- [x] 22 Server-authoritative diffing — `getFreshCaller` en cada router.
+- [x] 23 Nav survives reload — derivada de la ruta.
+
+## Cierre de brechas (2026-10-07)
+
+**Módulo 3 — Permisos editable.** `family` gana `listPermissions` (cualquier
+miembro lee los overrides de su familia) y `setPermission` (solo quien pasa
+`canManageFamily(…, "manage_members")`). Escriben las mismas filas
+`RolePermission` que `content/canWrite()` ya leía; no hay una segunda
+fuente de configuración. La validación vive en
+`family/_permissionOverride.ts` (sin imports, probada en
+`base44/functions/permissionOverride.test.ts`):
+- solo los roles `family_admin` y `member`, solo claves del registro;
+- **la sección `Familia` se rechaza**: una fila que concediera
+  `Familia:manage_members` reabriría la escalada cerrada el 2026-09-24;
+- poner un valor igual al default (o `null`) **borra** la fila en vez de
+  guardarla, así la tabla solo contiene desviaciones reales; filas duplicadas
+  se eliminan (con dos filas, el "primera gana" de `canWrite` sería arbitrario).
+
+`src/pages/Permisos.jsx` es la matriz (filas = acción, columnas = rol), con
+interruptor explícito "Editar permisos", casilla tri-estado por sección,
+"Restablecer" por sección y un punto ámbar en cada valor que es decisión de
+la familia. `src/lib/usePermissions.js` expone `can()` con la misma
+precedencia que el servidor; oculta subir (Home, `/subir`), comentar,
+reaccionar, borrar dibujo y editar el catálogo cuando el rol no puede.
+
+**Módulo 4 — CI.** `.github/workflows/ci.yml` en cada PR y push a `main`:
+lint, `validate:rls`, `validate:functions`, manifiestos de permisos al día
+(regenerar debe ser no-op), build y `deno test --allow-read`.
+
+**Módulo 7 — confirmación escrita.** `src/components/TypedConfirmDialog.jsx`:
+borrar la familia exige escribir su nombre; borrar la cuenta, `ELIMINAR`.
+"Hacer admin" ahora confirma y dice que quien promueve sigue siendo admin.
+
+**Módulo 20 — por qué el job horario nunca reapeó (causa medida, sin
+arreglar todavía).** Un `POST` sin cabeceras a la función desplegada
+responde `401 {"error":"unauthorized"}` (2026-10-07). Es justo lo que recibe
+el programador: según la documentación de Base44, una automatización
+programada invoca la función sin usuario y sin cabeceras propias, y
+`requireCron` exige `Authorization: Bearer <CRON_SECRET>`. Sesiones inactivas
+desde el 22-23 de septiembre siguen `passive`. El arreglo del PR #31 (mover la
+programación dentro de `automations`) era necesario pero no suficiente.
+
+Quitar el guard quedó **bloqueado a propósito** como debilitamiento de
+seguridad y espera decisión del dueño. Opciones:
+1. Dejar el job sin guard: no recibe datos, no devuelve datos, y solo revoca
+   lo que `session` ya rechaza (más de 48 h). Lo peor que logra un extraño es
+   adelantar esa limpieza.
+2. Mantener el guard y que lo llame Mission Control con el secreto (o por el
+   puente firmado con una acción `sessions.reap`) en su cron diario. Requiere
+   cambios en `acacia-mission-control`.
+3. No hacer nada: la seguridad ya la da `session` (probado); el costo es que
+   Mission Control y "Mi cuenta" cuentan sesiones muertas como vivas.
+
+El ejemplo canónico `shared/session/purgeStaleSessions.example.ts` del
+estándar tiene el mismo defecto: cualquier app Base44 que lo copió tiene el
+job muerto.
+
+**Herramienta nueva.** La API de Base44 tiene `GET …/backend-functions`,
+`GET …/functions-mgmt/{name}/logs` (devuelve `[]` incluso para funciones que
+sí corren — no sirve como evidencia) y
+`POST …/coding/redeploy-function/{name}`.
 
 ## Verificación por código en Login y rol elegido al aprobar (2026-09-30)
 

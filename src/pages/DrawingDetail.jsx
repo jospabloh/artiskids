@@ -4,6 +4,7 @@ import { base44 } from "@/api/base44Client";
 import { callFunction } from "@/lib/functions";
 import { Image } from "@/components/ui/image";
 import { useDrawingImages } from "@/lib/useDrawingImages";
+import { usePermissions } from "@/lib/usePermissions";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { ArrowLeft, Send, Heart, Trash2 } from "lucide-react";
@@ -22,6 +23,7 @@ export default function DrawingDetail() {
   const [posting, setPosting] = useState(false);
   const [people, setPeople] = useState([]);
   const imageUrl = useDrawingImages(drawing ? [drawing] : [])[drawing?.id];
+  const { can } = usePermissions();
 
   useEffect(() => {
     Promise.all([
@@ -140,6 +142,7 @@ export default function DrawingDetail() {
                 <button
                   key={em}
                   onClick={() => addReaction(em)}
+                  disabled={!can("Reacciones", "create")}
                   className="relative px-3 py-1.5 rounded-full bg-stone-50 border border-stone-200 hover:bg-amber-50 hover:border-amber-200 transition text-lg"
                 >
                   {em}
@@ -174,6 +177,7 @@ export default function DrawingDetail() {
           ))}
         </div>
 
+        {can("Comentarios", "create") && (
         <form onSubmit={submitComment} className="space-y-3">
           {people.length > 0 ? (
             <select
@@ -210,14 +214,17 @@ export default function DrawingDetail() {
             </button>
           </div>
         </form>
+        )}
       </div>
 
+      {can("Dibujos", "delete") && (
       <button
         onClick={remove}
         className="inline-flex items-center gap-1.5 text-sm text-stone-400 hover:text-rose-500 transition"
       >
         <Trash2 className="w-4 h-4" /> Eliminar dibujo
       </button>
+      )}
     </div>
   );
 }

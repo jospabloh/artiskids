@@ -10,7 +10,8 @@ import { createClientFromRequest } from "npm:@base44/sdk";
 import { tokenCutoff } from "./_tokenCutoff.ts";
 import { secrets } from "base44:runtime";
 import { signAs } from "./_acaciaSign.ts";
-import { defaultAllowed } from "./_permissions.generated.ts";
+import { defaultAllowed, PERMISSION_REGISTRY } from "./_permissions.generated.ts";
+import { decideOverride } from "./_permissionOverride.ts";
 import { resolveApprovedRole } from "./_assignableRoles.ts";
 
 const FAMILY_ADMIN = "family_admin";
@@ -501,6 +502,58 @@ export default async function (req: Request): Promise<Response> {
           comments,
           reactions,
         });
+      }
+
+      case "listPermissions": {
+        // The Permisos matrix's read: this family's overrides only. Any
+        // member may read them (the page shows everyone what their role can
+        // do); only setPermission below changes them.
+        const fresh = await getFreshCaller(base44, caller.id);
+        if (!fresh.family_id) return Response.json({ error: "not in a family" }, { status: 403 });
+        const rows = await base44.asServiceRole.entities.RolePermission.filter({ family_id: fresh.family_id });
+        const overrides = rows.map((r: Record<string, unknown>) => ({
+          role: r.role,
+          permission_key: r.permission_key,
+          allowed: Boolean(r.allowed),
+        }));
+        return Response.json({ overrides });
+      }
+
+      case "setPermission": {
+        // Module 3: a family admin changing what a role can do. Writes the
+        // same RolePermission rows content's canWrite() already reads, so
+        // there is no second config surface. family_id comes from the
+        // caller's own stored row, never the request.
+        const fresh = await getFreshCaller(base44, caller.id);
+        if (!fresh.family_id) return Response.json({ error: "not in a family" }, { status: 403 });
+        if (!canManageFamily(fresh, "manage_members")) {
+          return Response.json({ error: "not allowed to change permissions" }, { status: 403 });
+        }
+        const allowed = p.allowed === undefined ? null : p.allowed;
+        const decision = decideOverride(PERMISSION_REGISTRY, p.role, p.permission_key, allowed);
+        if (!decision.ok) return badRequest(decision.error);
+
+        const match = {
+          family_id: fresh.family_id as string,
+          role: p.role as string,
+          // The canonical key, never the raw request string.
+          permission_key: decision.key,
+        };
+        const existing = await base44.asServiceRole.entities.RolePermission.filter(match);
+        if (decision.storeRow) {
+          if (existing[0]) {
+            await base44.asServiceRole.entities.RolePermission.update(existing[0].id, { allowed });
+          } else {
+            await base44.asServiceRole.entities.RolePermission.create({ ...match, allowed });
+          }
+          // Duplicates would make canWrite's "first row wins" arbitrary.
+          for (const extra of existing.slice(1)) {
+            await base44.asServiceRole.entities.RolePermission.delete(extra.id);
+          }
+        } else {
+          for (const row of existing) await base44.asServiceRole.entities.RolePermission.delete(row.id);
+        }
+        return Response.json({ ok: true });
       }
 
       default:

@@ -5,6 +5,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { callFunction } from "@/lib/functions";
 import { notifyMissionControl } from "@/lib/notifyMissionControl";
 import SupportEscapeHatch from "@/components/SupportEscapeHatch";
+import { usePermissions } from "@/lib/usePermissions";
 import { Image as ImageIcon, Loader2, Save } from "lucide-react";
 
 const ALBUM_SUGGESTIONS = ["Mis primeros trazos", "Animales", "La familia", "El cole", "Vacaciones", "Cumpleaños", "Otros"];
@@ -12,6 +13,7 @@ const ALBUM_SUGGESTIONS = ["Mis primeros trazos", "Animales", "La familia", "El 
 export default function Upload() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { can, billingBlocked, loading: permissionsLoading } = usePermissions();
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
   const [form, setForm] = useState({ title: "", description: "", drawn_date: "", creator_name: "", album: "Otros" });
@@ -76,7 +78,16 @@ export default function Upload() {
       <h1 className="font-heading font-bold text-2xl text-stone-800 mb-1">Subir un dibujo</h1>
       <p className="text-sm text-stone-500 mb-6">Digitaliza la obra en alta calidad para preservarla para siempre.</p>
 
-      {fatalError ? (
+      {!permissionsLoading && !can("Dibujos", "upload") ? (
+        <div className="bg-white rounded-2xl border border-stone-100 shadow-sm p-6 text-center text-sm text-stone-600">
+          {billingBlocked ? (
+            <>Tu familia está en modo de solo lectura. Revisa el plan en <Link to="/cuenta" className="font-medium text-amber-600">Mi cuenta</Link>.</>
+          ) : (
+            <>Un administrador de tu familia desactivó la subida de dibujos para tu rol.
+            Pídele que lo cambie en <Link to="/permisos" className="font-medium text-amber-600">Permisos</Link>.</>
+          )}
+        </div>
+      ) : fatalError ? (
         <div className="bg-white rounded-2xl border border-stone-100 shadow-sm p-6 text-center space-y-4">
           <p className="text-sm text-stone-600">
             Algo no funcionó de nuestro lado y no pudimos guardar tu dibujo.
