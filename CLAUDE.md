@@ -986,9 +986,9 @@ nombrada · `[ ]` abierto. Texto completo de cada módulo:
       cuentas QA el 2026-10-02.
 - [x] 15 Bridge — llave derivada, `ACCEPT_LEGACY_MASTER = false`, probado.
 - [~] 16 Secrets — `ACACIA_APP_SLUG` e `INGEST_HMAC_SECRET` probados por sync.
-      `CRON_SECRET`: el valor da igual mientras el programador de Base44 no lo
-      mande (ver módulo 20). `PLATFORM_OWNER_EMAIL` solo se usa en
-      `deleteMyAccount`; sin probar.
+      `CRON_SECRET` ya no lo lee ninguna función (el job de reap quedó sin
+      guard, decisión del dueño 2026-10-07); el secreto puede borrarse.
+      `PLATFORM_OWNER_EMAIL` solo se usa en `deleteMyAccount`; sin probar.
 - [x] 17 Mission Control side — fila, adaptador, configuración, sync probado.
 - [x] 18 Retired — una cuenta, una familia; 409 a una segunda.
 - [x] 19 Locks state their rationale in their own field descriptions.
@@ -1032,8 +1032,8 @@ lint, `validate:rls`, `validate:functions`, manifiestos de permisos al día
 borrar la familia exige escribir su nombre; borrar la cuenta, `ELIMINAR`.
 "Hacer admin" ahora confirma y dice que quien promueve sigue siendo admin.
 
-**Módulo 20 — por qué el job horario nunca reapeó (causa medida, sin
-arreglar todavía).** Un `POST` sin cabeceras a la función desplegada
+**Módulo 20 — por qué el job horario nunca reapeó (causa medida; arreglo
+abajo, "Opción 1").** Un `POST` sin cabeceras a la función desplegada
 responde `401 {"error":"unauthorized"}` (2026-10-07). Es justo lo que recibe
 el programador: según la documentación de Base44, una automatización
 programada invoca la función sin usuario y sin cabeceras propias, y
@@ -1041,8 +1041,11 @@ programada invoca la función sin usuario y sin cabeceras propias, y
 desde el 22-23 de septiembre siguen `passive`. El arreglo del PR #31 (mover la
 programación dentro de `automations`) era necesario pero no suficiente.
 
-Quitar el guard quedó **bloqueado a propósito** como debilitamiento de
-seguridad y espera decisión del dueño. Opciones:
+Quitar el guard quedó primero **bloqueado a propósito** como debilitamiento de
+seguridad, a la espera de la decisión del dueño. **El dueño eligió la opción 1
+el 2026-10-07**: `purgeStaleSessions` ya no tiene guard y `_internalGuard.ts`
+se borró; el razonamiento quedó en el comentario de su `entry.ts`. Las
+opciones eran:
 1. Dejar el job sin guard: no recibe datos, no devuelve datos, y solo revoca
    lo que `session` ya rechaza (más de 48 h). Lo peor que logra un extraño es
    adelantar esa limpieza.
