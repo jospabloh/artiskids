@@ -34,6 +34,11 @@ Deno.test("keys outside the registry are refused", () => {
   assertFalse(decideOverride(PERMISSION_REGISTRY, "member", "Dibujos:publish", true).ok);
   assertFalse(decideOverride(PERMISSION_REGISTRY, "member", "nonsense", true).ok);
   assertFalse(decideOverride(PERMISSION_REGISTRY, "member", "Dibujos:upload", "yes").ok);
+  // A trailing segment would validate as Dibujos:upload but store a key
+  // canWrite never reads; prototype names must not pass as registry keys.
+  assertFalse(decideOverride(PERMISSION_REGISTRY, "member", "Dibujos:upload:junk", false).ok);
+  assertFalse(decideOverride(PERMISSION_REGISTRY, "member", "constructor:name", true).ok);
+  assertFalse(decideOverride(PERMISSION_REGISTRY, "member", "toString:call", true).ok);
 });
 
 Deno.test("setting a value back to the default drops the row instead of storing it", () => {

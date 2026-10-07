@@ -13,7 +13,7 @@ const ALBUM_SUGGESTIONS = ["Mis primeros trazos", "Animales", "La familia", "El 
 export default function Upload() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { can, loading: permissionsLoading } = usePermissions();
+  const { can, billingBlocked, loading: permissionsLoading } = usePermissions();
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
   const [form, setForm] = useState({ title: "", description: "", drawn_date: "", creator_name: "", album: "Otros" });
@@ -80,8 +80,12 @@ export default function Upload() {
 
       {!permissionsLoading && !can("Dibujos", "upload") ? (
         <div className="bg-white rounded-2xl border border-stone-100 shadow-sm p-6 text-center text-sm text-stone-600">
-          Un administrador de tu familia desactivó la subida de dibujos para tu rol.
-          Pídele que lo cambie en <Link to="/permisos" className="font-medium text-amber-600">Permisos</Link>.
+          {billingBlocked ? (
+            <>Tu familia está en modo de solo lectura. Revisa el plan en <Link to="/cuenta" className="font-medium text-amber-600">Mi cuenta</Link>.</>
+          ) : (
+            <>Un administrador de tu familia desactivó la subida de dibujos para tu rol.
+            Pídele que lo cambie en <Link to="/permisos" className="font-medium text-amber-600">Permisos</Link>.</>
+          )}
         </div>
       ) : fatalError ? (
         <div className="bg-white rounded-2xl border border-stone-100 shadow-sm p-6 text-center space-y-4">

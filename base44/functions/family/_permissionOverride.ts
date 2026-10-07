@@ -14,7 +14,7 @@ export const OVERRIDABLE_ROLES = ["family_admin", "member"] as const;
 export const LOCKED_SECTIONS = ["Familia"] as const;
 
 export type OverrideDecision =
-  | { ok: true; section: string; action: string; storeRow: boolean }
+  | { ok: true; key: string; section: string; action: string; storeRow: boolean }
   | { ok: false; error: string };
 
 /**
@@ -35,11 +35,15 @@ export function decideOverride(
   if (typeof role !== "string" || !(OVERRIDABLE_ROLES as readonly string[]).includes(role)) {
     return { ok: false, error: "invalid role" };
   }
-  if (typeof key !== "string" || !key.includes(":")) {
-    return { ok: false, error: "invalid permission_key" };
+  if (typeof key !== "string") return { ok: false, error: "invalid permission_key" };
+  const parts = key.split(":");
+  if (parts.length !== 2) return { ok: false, error: "invalid permission_key" };
+  const [section, action] = parts;
+  // Own properties only: "constructor:name" must not resolve through the
+  // prototype chain into something that looks like a registry entry.
+  if (!Object.hasOwn(registry, section) || !Object.hasOwn(registry[section], action)) {
+    return { ok: false, error: "unknown permission_key" };
   }
-  const [section, action] = key.split(":", 2);
-  if (!registry[section]?.[action]) return { ok: false, error: "unknown permission_key" };
   if ((LOCKED_SECTIONS as readonly string[]).includes(section)) {
     return { ok: false, error: "this permission can't be changed" };
   }
@@ -48,5 +52,5 @@ export function decideOverride(
   }
   const defaultValue = registry[section][action].includes(role);
   const storeRow = allowed !== null && allowed !== defaultValue;
-  return { ok: true, section, action, storeRow };
+  return { ok: true, key: `${section}:${action}`, section, action, storeRow };
 }

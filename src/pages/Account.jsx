@@ -72,6 +72,7 @@ export default function Account() {
     setBusy(key);
     try {
       await action();
+      return true;
     } catch (err) {
       if (err.isRouterError) {
         setError(err.message);
@@ -82,6 +83,7 @@ export default function Account() {
     } finally {
       setBusy("");
     }
+    return false;
   };
 
   const changeRole = (targetUserId, newRole) =>
@@ -410,7 +412,9 @@ export default function Account() {
         busy={busy === "deleteMyAccount"}
         onCancel={() => setPendingDelete(null)}
         onConfirm={async () => {
-          await deleteMyAccount();
+          // On failure the dialog closes too, so the error shown at the top
+          // of the page isn't hidden behind it; scroll there.
+          if (!(await deleteMyAccount())) window.scrollTo({ top: 0, behavior: "smooth" });
           setPendingDelete(null);
         }}
       />
@@ -423,7 +427,7 @@ export default function Account() {
         busy={busy === "deleteFamily"}
         onCancel={() => setPendingDelete(null)}
         onConfirm={async () => {
-          await deleteFamily();
+          if (!(await deleteFamily())) window.scrollTo({ top: 0, behavior: "smooth" });
           setPendingDelete(null);
         }}
       />

@@ -536,7 +536,8 @@ export default async function (req: Request): Promise<Response> {
         const match = {
           family_id: fresh.family_id as string,
           role: p.role as string,
-          permission_key: p.permission_key as string,
+          // The canonical key, never the raw request string.
+          permission_key: decision.key,
         };
         const existing = await base44.asServiceRole.entities.RolePermission.filter(match);
         if (decision.storeRow) {

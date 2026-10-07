@@ -58,7 +58,8 @@ export default function Permisos() {
   const queryClient = useQueryClient();
   const { overrides, loading } = usePermissions();
   const platformAdmin = isPlatformAdmin(user);
-  const canEdit = platformAdmin || isFamilyAdmin(user);
+  // Overrides belong to a family; with none there is nothing to edit.
+  const canEdit = Boolean(user?.family_id) && (platformAdmin || isFamilyAdmin(user));
   const role = user?.family_role;
 
   const [editing, setEditing] = useState(false);
