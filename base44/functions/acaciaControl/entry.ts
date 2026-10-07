@@ -8,12 +8,13 @@
 // with a Family/SupportTicket/AppSession model -- ping, licenses.list,
 // license.set, usage.summary, usage.tenantCount, tickets.list,
 // tickets.update, sessions.list, sessions.revoke, tenants.contacts.
+// emails.sendFollowup was added 2026-10-07: Mission Control's new-tenant and
+// new-ticket alerts to the platform owner go through it for EVERY app, and
+// without it each ArtisKids alert failed with `unknown action` (3 of them
+// between 2026-10-02 and 10-03 never reached the owner).
 // Deliberately NOT implemented yet: license.deletePremiumData (premium-data
-// downgrade path -- artiskids has no premium-only data model decided),
-// emails.sendFollowup / emails.status (no email-sending integration chosen
-// for this app yet). Both are called only if Mission Control's own registry
-// entry for artiskids (Phase 5) is configured to call them, which it won't
-// be until they're built -- add the case here first, then wire the config.
+// downgrade path -- artiskids has no premium-only data model decided) and
+// emails.status.
 import { createClientFromRequest } from "npm:@base44/sdk";
 import { secrets } from "base44:runtime";
 import { verifyAs } from "./_acaciaSign.ts";
@@ -26,7 +27,8 @@ const LICENSE_ENTITIES = new Set(["Family"]);
 const USAGE_ENTITIES = new Set(["Drawing", "Child", "Comment", "Reaction"]);
 const TICKET_ENTITY = "SupportTicket";
 const SESSION_ENTITY = "AppSession";
-const WRITE_ACTIONS = new Set(["license.set", "tickets.update", "sessions.revoke"]);
+// emails.sendFollowup sends mail to a customer: a replayed signed request would re-send it.
+const WRITE_ACTIONS = new Set(["license.set", "tickets.update", "sessions.revoke", "emails.sendFollowup"]);
 
 function badRequest(message: string, status = 400): Response {
   return Response.json({ error: message }, { status });
@@ -165,6 +167,28 @@ export default async function (req: Request): Promise<Response> {
           }
         }
         return Response.json({ ok: true, revoked });
+      }
+
+      case "emails.sendFollowup": {
+        // Mission Control owns the recipient and the rendered content; the
+        // bridge only sends it through the app's email integration.
+        const to = String(p.to ?? "");
+        const subject = String(p.subject ?? "");
+        const html = String(p.html ?? "");
+        if (!to || !subject || !html) return badRequest("params.to/subject/html required");
+        await base44.asServiceRole.integrations.Core.SendEmail({ to, subject, body: html, from_name: "ACACIA" });
+        // Core.SendEmail has no bcc: the platform owner gets a separate copy of
+        // customer mail. `internal` = an ops notice MC already addresses to the
+        // owner (new tenant, new ticket), where a copy would be a duplicate.
+        const ownerEmail = secrets.get("PLATFORM_OWNER_EMAIL");
+        if (ownerEmail && ownerEmail !== to && p.internal !== true) {
+          try {
+            await base44.asServiceRole.integrations.Core.SendEmail({
+              to: ownerEmail, subject: `[Copia → ${to}] ${subject}`, body: html, from_name: "ACACIA",
+            });
+          } catch { /* owner copy is best-effort */ }
+        }
+        return Response.json({ ok: true, sent_at: new Date().toISOString(), recipient: to });
       }
 
       case "tenants.contacts": {
