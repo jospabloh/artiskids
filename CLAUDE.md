@@ -992,11 +992,11 @@ nombrada · `[ ]` abierto. Texto completo de cada módulo:
 - [x] 17 Mission Control side — fila, adaptador, configuración, sync probado.
 - [x] 18 Retired — una cuenta, una familia; 409 a una segunda.
 - [x] 19 Locks state their rationale in their own field descriptions.
-- [~] 20 Session control — aviso de inactividad, lista de dispositivos,
-      revocación por `iat`, y la regla de 48 h dentro de `session` **probada en
-      producción** (3 filas `revoked_by: system` con `device_id` retirado).
-      **Brecha: el job horario `purgeStaleSessions` nunca ha limpiado nada** —
-      ver "Cierre de brechas".
+- [x] 20 Session control — aviso de inactividad, lista de dispositivos,
+      revocación por `iat`, la regla de 48 h dentro de `session` y el job
+      horario, **todo probado en producción**. El job corre desde el workflow
+      `base44/workflows/purge-stale-sessions-hourly.jsonc`, no desde
+      `function.jsonc` — ver "Cierre de brechas".
 - [x] 21 About screen.
 - [x] 22 Server-authoritative diffing — `getFreshCaller` en cada router.
 - [x] 23 Nav survives reload — derivada de la ruta.
@@ -1058,6 +1058,29 @@ opciones eran:
 El ejemplo canónico `shared/session/purgeStaleSessions.example.ts` del
 estándar tiene el mismo defecto: cualquier app Base44 que lo copió tiene el
 job muerto.
+
+**Y quitar el guard tampoco bastaba: el bloque `automations` de
+`function.jsonc` nunca creó una programación (2026-10-07, medido).** Tras
+publicar sin guard, la ejecución de las 04:00 UTC no ocurrió: la sesión de
+prueba (`last_active_at` 2026-10-04) seguía `active` a las 09:51 UTC, y
+`GET …/workflows` devolvía `[]`. Es decir, ninguna ejecución programada
+existió jamás; el `401` era un problema real, pero escondía otro. El
+programador de Base44 es el **workflow** (`POST …/workflows`, disparador
+`scheduled`, paso `invoke_backend_function`): se creó
+`purge-stale-sessions-hourly` (`0 * * * *`, UTC) y el propio sistema lo
+sincronizó al repo como `base44/workflows/purge-stale-sessions-hourly.jsonc`.
+
+**Probado:** la ejecución programada de las 10:04 UTC (`trigger_type:
+scheduled`, `is_test_run: false`, `completed`) revocó la sesión de prueba
+(`revoked_by: system`, `revoked_at` 10:04:34). Una corrida manual a las 10:11
+también terminó `completed`. El bloque `automations` de
+`purgeStaleSessions/function.jsonc` queda inerte; no se tocó para no mover
+una función desplegada por algo cosmético. **El workflow cuesta ~0.2 créditos
+por corrida** (≈ 4.8/día).
+
+**Para otras apps Base44 con un job programado:** que la función responda 200
+no prueba que alguien la llame. Comprobar `GET …/workflows` (o la lista de
+ejecuciones) y una fila de prueba envejecida a propósito, como aquí.
 
 **Desplegado y probado en producción (2026-10-07, PR #35, `d590d30`).**
 `POST …/github/sync` trajo los 4 commits y el árbol de Base44 quedó con los
