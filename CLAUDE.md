@@ -1056,6 +1056,20 @@ El ejemplo canónico `shared/session/purgeStaleSessions.example.ts` del
 estándar tiene el mismo defecto: cualquier app Base44 que lo copió tiene el
 job muerto.
 
+**Desplegado y probado en producción (2026-10-07, PR #35, `d590d30`).**
+`POST …/github/sync` trajo los 4 commits y el árbol de Base44 quedó con los
+mismos SHA-256 que `main`, **pero la función `family` seguía vieja**
+(`listPermissions` → `404 unknown action`). Lo que la desplegó fue **publicar**
+(`POST …/deploy`): después, `listPermissions` → `403 not in a family` (código
+nuevo) y el bundle servido trae "Editar permisos" y "Para confirmar, escribe".
+Con una cuenta QA nueva (`+ak1007p`, borrada al final junto con su familia):
+`Familia:manage_members`, `Dibujos:upload:junk` y `constructor:name` → 400;
+`Dibujos:upload=false` para `family_admin` → `listPermissions` lo muestra y
+`content/createDrawing` responde `403 not allowed to upload`; `allowed:null`
+→ la fila desaparece y la subida vuelve a pasar el permiso. **No probado en
+navegador:** la matriz y el diálogo de confirmación escrita (sin sesión
+gráfica desde el sandbox).
+
 **Herramienta nueva.** La API de Base44 tiene `GET …/backend-functions`,
 `GET …/functions-mgmt/{name}/logs` (devuelve `[]` incluso para funciones que
 sí corren — no sirve como evidencia) y
