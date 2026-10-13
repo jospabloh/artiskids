@@ -8,6 +8,7 @@ import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import ScrollToTop from './components/ScrollToTop';
 import ThemeSwitcher from '@/components/ThemeSwitcher';
+import UpdateBanner from '@/components/UpdateBanner';
 import IdleWarningDialog from '@/components/IdleWarningDialog';
 import SessionExpiredDialog from '@/components/SessionExpiredDialog';
 import { useSessionManager } from '@/hooks/useSessionManager';
@@ -122,6 +123,7 @@ function App() {
             <AuthenticatedApp />
           </Router>
           <ThemeSwitcher />
+          <UpdateBanner />
           <Toaster />
         </QueryClientProvider>
       </AuthProvider>
