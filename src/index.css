@@ -95,6 +95,15 @@
       --theme-switcher-bottom: 4.5rem;
     }
   }
+
+  /* New-version notice (src/components/UpdateBanner.jsx, Module 30) — position
+     only. Layout.jsx's sticky header is h-16 (4rem) plus a 1px border-b at
+     EVERY width (on desktop it also holds the nav), so the notice drops below
+     it everywhere instead of covering the logout button / nav. 4.75rem = 4rem
+     + 1px + the same ~0.75rem gap the notice keeps by default. */
+  :root {
+    --update-banner-top: 4.75rem;
+  }
 }
 
 
